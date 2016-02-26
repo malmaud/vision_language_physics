@@ -1,0 +1,24 @@
+\documentclass{article}
+\usepackage{amsmath}
+\newcommand{\urel}[2]{\text{\texttt{#1}}(#2)}
+\newcommand{\brel}[3]{\text{\texttt{#1}}(#2,#3)}
+\title{Physical predicates}
+\begin{document}
+  \maketitle
+\section{Relations}
+\begin{tabular}{r|l}
+  $ \brel{supports}{x}{y} $ & $x$ physically supports $y$ \\
+  $ \urel{freefall}{x} $ & The only force acting on $x$ is gravity \\
+  $ \brel{impulse}{x}{y} $ & $x$ imparts an impulse force on $y$ \\
+\end{tabular}
+\section{Definitions}
+\begin{tabular}{r|l}
+  $\brel{pickup}{x}{y}$ & $\exists z\,\brel{supports}{z}{y}\mapsto\brel{supports}{x}{y}$ \\
+  $\brel{putdown}{x}{y}$ & $\brel{supports}{x}{y} \land \urel{moving}{y} \mapsto \exists z\, \brel{supports}{z}{y}$\\
+  $\brel{throw}{x}{y}$ & $\brel{supports}{x}{y}\mapsto (\lnot \exists z\, \brel{supports}{z}{y}) \land \urel{moving}{y} \land \lnot \urel{freefall}{y}$ \\
+  $\brel{drop}{x}{y}$ & $\brel{supports}{x}{y}\mapsto (\lnot \exists z\, \brel{supports}{z}{y}) \land \urel{moving}{y} \land \urel{freefall}{y}$ \\
+  $\brel{push}{x}{y}$ & $\exists z\,\brel{supports}{z}{y}\mapsto\brel{impulse}{x}{y}\mapsto\urel{moving}{y}\land\brel{supports}{z}{y}$\\
+
+
+\end{tabular}
+\end{document}
