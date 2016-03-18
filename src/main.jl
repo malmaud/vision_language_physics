@@ -2,6 +2,7 @@ using Compat
 using Images
 
 include("types.jl")
+include("optical_flow.jl")
 
 function center(d::Detection)
     Point((d.ul.x+d.lr.x)/2, (d.lr.x+d.lr.y)/2)
@@ -60,6 +61,10 @@ function does_accept(::LeftOfPredicate, d1, d2, params)
     return c1.x < c2.x + params.pp
 end
 
+function does_accept(::LiftPredicate, d1, params)
+
+end
+
 
 does_accept(::StationaryPredicate, d1, params) = true
 
@@ -91,4 +96,26 @@ end
 function find_track(res::DetectorResult, word::Word)
 end
 
+
+
 include("detector.jl")
+
+
+
+function load_frames(path)
+    ids = Int[]
+    data = Array{Float64, 3}[]
+    for file in readdir(path)
+        m = match(r".*?(\d+).*", file)
+        if m !== nothing
+            push!(ids, parse(Int, m.captures[1]))
+            push!(data, raw_data(joinpath(path, file)))
+        end
+    end
+    pixel_data = data[sortperm(ids)]
+    flow = Array{Float64,3}[]
+    for i=1:length(ids)-1
+        push!(flow, calc_flow(pixel_data[i], pixel_data[i+1]))
+    end
+    ClipSequence(pixel_data, flow)
+end

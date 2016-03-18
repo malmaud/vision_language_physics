@@ -1,6 +1,7 @@
 using Images
 using PyPlot
 using Compat
+using FastAnonymous
 
 raw_data(im::Image) = convert(Array{Float64}, data(separate(im)))
 raw_data(path::AbstractString) = raw_data(load(path))
@@ -26,12 +27,10 @@ function dilate(box_ids, i, j, w, h, box_id, d, threshold, checked)
 
 end
 
-function run_pumpkin_detector(frame)
+function run_color_detector(frame, threshold, base_color, object_name)
     detections = Vector{Detection}()
-    base_color = [191, 103, 1]/255
     w, h = size(frame,1), size(frame, 2)
     d = Array{Float64}(w, h)
-    threshold = .1
     for i=1:w
         for j=1:h
             d[i, j] = (frame[i,j,1]-base_color[1])^2 + (frame[i,j,2]-base_color[2])^2 + (frame[i,j,3]-base_color[3])^2
@@ -57,7 +56,7 @@ function run_pumpkin_detector(frame)
         max_x, max_y = 0, 0
         for i=1:w
             for j=1:h
-                if box_ids[i,j]==box_id
+                if box_ids[i,j] == box_id
                     min_x = min(min_x, j)
                     max_x = max(max_x, j)
                     min_y = min(min_y, i)
@@ -67,15 +66,22 @@ function run_pumpkin_detector(frame)
         end
         push!(detections,
             Detection(Point(min_x, min_y), Point(max_x, max_y),
-                0.0, :pumpkin))
+                0.0, object_name))  # todo calculate actual score
     end
-    # detections = filter(d->width(d)>1, detections)
-    d,box_ids, detections
+    filter(d->width(d)>2, detections)
 end
+
+run_pumpkin_detector(frame) = run_color_detector(
+    frame, .1, [191, 103, 1]/255, :pumpkin)
+
+run_ball_detector(frame) = run_color_detector(
+    frame, .1, [19, 128, 221]/255, :ball)
 
 function run_detectors(frame)
     detections = Vector{Detection}()
-    append!(detections, run_pumpkin_detector(frame))
+    for detector in [run_pumpkin_detector, run_ball_detector]
+        append!(detections, detector(frame))
+    end
     return FrameDetection(detections)
 end
 

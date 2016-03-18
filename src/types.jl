@@ -1,3 +1,8 @@
+immutable ClipSequence
+    pixels::Vector{Array{Float64,3}}
+    flow::Vector{Array{Float64,3}}
+end
+
 immutable Point
     x::Int
     y::Int
@@ -8,6 +13,8 @@ immutable Detection
     lr::Point
     score::Float64
     class::Symbol
+    # flow_x::Float64
+    # flow_y::Float64
 end
 
 immutable FrameDetection
@@ -38,6 +45,9 @@ immutable StationaryButFarPredicate <: Predicate
 end
 
 immutable LeftOfPredicate <: Predicate
+end
+
+immutable LiftPredicate <: Predicate
 end
 
 immutable PredParams
