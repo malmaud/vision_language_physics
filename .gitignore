@@ -66,3 +66,6 @@ target/
 *.aux
 *.db_latexmk
 *.fls
+*.fdb_latexmk
+predicates/predicates.pdf
+*Auto-Save*
