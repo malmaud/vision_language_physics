@@ -2,6 +2,7 @@ using Compat
 using Images
 
 include("types.jl")
+include("annotations.jl")
 include("optical_flow.jl")
 
 function center(d::Detection)
@@ -17,16 +18,18 @@ Images.width(d::Detection) = width(d.ul, d.lr)
 
 distance(d1::Detection, d2::Detection) = distance(center(d1), center(d2))
 
+logistic(x, α, β) = 1 ./ (1+exp(-β*(x-α)))
+
 function motion_coherence_score(distance)
     α = 50.0
     β = -1/11
-    1 ./ (1+exp(-β*(distance-α)))
+    logistic(distance, α, β)
 end
 
 function normed_detector_score(s)
     α = 1.0
     β = 2.0
-    1 ./ (1+exp(-β*(s-α)))
+    logistic(s, α, β)
 end
 
 function score(t::Track, res::DetectorResult)
@@ -41,8 +44,6 @@ function score(t::Track, res::DetectorResult)
     end
     score
 end
-
-
 
 function does_accept(::FarPredicate, d1::Detection, d2::Detection, params)
     c1, c2 = center(d1), center(d2)
@@ -65,7 +66,6 @@ function does_accept(::LiftPredicate, d1, params)
 
 end
 
-
 does_accept(::StationaryPredicate, d1, params) = true
 
 function does_accept(::StationaryButFarPredicate, d1, d2, params)
@@ -73,7 +73,6 @@ function does_accept(::StationaryButFarPredicate, d1, d2, params)
     does_accept(StationaryPredicate, d1, params) &&
     does_accept(StationaryPredicate, d2, params)
 end
-
 
 function does_accept(::FromLeftWord, t1::Track, t2::Track, detections, params)
     needed_frames = 5
@@ -96,11 +95,7 @@ end
 function find_track(res::DetectorResult, word::Word)
 end
 
-
-
 include("detector.jl")
-
-
 
 function load_frames(path)
     ids = Int[]

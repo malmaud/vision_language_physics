@@ -1,3 +1,6 @@
+*.tags*
+scratch.jl
+
 data/
 
 # Byte-compiled / optimized / DLL files

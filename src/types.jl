@@ -17,6 +17,15 @@ immutable Detection
     # flow_y::Float64
 end
 
+immutable Annotation
+    track_id::Int
+    detection::Detection
+    frame_id::Int
+    lost::Bool
+    occluded::Bool
+    generated::Bool
+end
+
 immutable FrameDetection
     detections::Vector{Detection}
 end

@@ -6,23 +6,40 @@ using FastAnonymous
 raw_data(im::Image) = convert(Array{Float64}, data(separate(im)))
 raw_data(path::AbstractString) = raw_data(load(path))
 
+macro neighbors(coords...)
+    e = Expr(:tuple)
+    for (idx, coord) in enumerate(coords)
+        for sign in [:+, :-]
+            e2 = Expr(:tuple)
+            for (idx2, coord2) in enumerate(coords)
+                if idx==idx2
+                    push!(e2.args, :($sign($coord, 1)))
+                else
+                    push!(e2.args, coord2)
+                end
+            end
+            push!(e.args, e2)
+        end
+    end
+    e
+end
+
+function isoutbounds(x, y, w, h)
+    x<1 || y<1 || x>w || y>h
+end
+
 function dilate(box_ids, i, j, w, h, box_id, d, threshold, checked)
-    if i<1 || j<1 || i>w || j>h
+    isoutbounds(i, j, w, h) && return
+    checked[i, j] && return
+    checked[i,j] = true
+    if d[i,j] > threshold
         return
     end
-    if checked[i,j]
-        return
-    end
-    checked[i,j]=true
-    if d[i,j]>threshold
-        return
-    end
-    if box_ids[i,j]==0
-        box_ids[i,j]=box_id
-        dilate(box_ids, i-1, j, w, h, box_id, d, threshold, checked)
-        dilate(box_ids, i+1, j, w, h, box_id, d, threshold, checked)
-        dilate(box_ids, i, j-1, w, h, box_id, d, threshold, checked)
-        dilate(box_ids, i, j+1, w, h, box_id, d, threshold, checked)
+    if box_ids[i,j] == 0
+        box_ids[i,j] = box_id
+        for (x_coord, y_coord) in @neighbors(i,j)
+            dilate(box_ids, x_coord, y_coord, w, h, box_id, d, threshold, checked)
+        end
     end
 
 end
@@ -33,7 +50,11 @@ function run_color_detector(frame, threshold, base_color, object_name)
     d = Array{Float64}(w, h)
     for i=1:w
         for j=1:h
-            d[i, j] = (frame[i,j,1]-base_color[1])^2 + (frame[i,j,2]-base_color[2])^2 + (frame[i,j,3]-base_color[3])^2
+            ssq=0.0
+            for c=1:3
+                ssq += (frame[i, j, c] - base_color[c])^2
+            end
+            d[i, j] = ssq
         end
     end
     box_ids = zeros(Int, w, h)
