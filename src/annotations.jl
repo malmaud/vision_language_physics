@@ -7,7 +7,7 @@ function parse_line(line)
     track_id = parse(Int, parts[1])
     ul = Point(parse(Int, parts[2]), parse(Int, parts[3]))
     lr = Point(parse(Int, parts[4]), parse(Int, parts[5]))
-    detection = Detection(ul, lr, NaN, convert(Symbol, parts[10][2:end-1]))
+    detection = Detection(ul, lr, Inf, convert(Symbol, parts[10][2:end-1]))
     frame_id = parse(Int, parts[6])
     Annotation(
         track_id, detection, frame_id, str_to_bool(parts[7]),
@@ -33,6 +33,6 @@ function to_detector_results(annotations)
     DetectionResult(frames), tracks
 end
 
-frames,tracks=to_detector_results(anns)
+# frames,tracks=to_detector_results(anns)
 # frames[3].detections
 # tracks[2].detection_ids
