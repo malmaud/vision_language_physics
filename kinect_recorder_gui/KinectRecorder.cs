@@ -4,8 +4,11 @@ using System.IO;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Collections.Generic;
+using System.Collections;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using System.Threading;
+using System.Collections.Concurrent;
 
 namespace kinect_recorder_gui
 {
@@ -22,6 +25,18 @@ namespace kinect_recorder_gui
         public int frame_idx;
         public int frame_start;
         public int video_idx;
+    }
+
+    struct FramePair
+    {
+        public int frame_id;
+        public int file_id;
+    }
+
+    struct BufferForFrame
+    {
+        public byte[] buffer;
+        public int frame_id;
     }
 
     class KinectRecorder
@@ -43,13 +58,18 @@ namespace kinect_recorder_gui
         public int FlushRate { get; set; }
         public int Resolution { get; set; }
         private string recordingPath;
-
+        private BlockingCollection<ushort[]> depthQueue;
+        private BlockingCollection<BufferForFrame> colorQueue;
         private VideoStats colorIdx;
         private VideoStats depthIdx;
         //private int colorIdx;
         //private int colorIdxStart;
         //private int colorVideoIdx;
         private List<Task> encoderTasks;
+        private Thread depthWriter;
+        private Thread colorWriter;
+        private List<FramePair> depthFrames;
+        private List<FramePair> colorFrames;
 
         private void DepthFrameArrived(object sender, DepthFrameArrivedEventArgs e)
         {
@@ -58,61 +78,68 @@ namespace kinect_recorder_gui
             var props = sensor.DepthFrameSource.FrameDescription;
             if ((frameTick % Resolution) == 0)
             {
-                Task.Run(() =>
+              
+                bool doProcess = false;
+                var buffer = new ushort[props.Width * props.Height];
+                using (var frame = e.FrameReference.AcquireFrame())
                 {
-                    bool doProcess = false;
-                    var buffer = new ushort[props.Width * props.Height];
-                    var processedBuffer = new byte[props.Width * props.Height];
-                    var depthBitmap = new WriteableBitmap(props.Width, props.Height, 96, 96, PixelFormats.Gray8, null);
-                    using (var frame = e.FrameReference.AcquireFrame())
+
+                    if (frame != null)
                     {
-
-                        if (frame != null)
-                        {
-                            frame.CopyFrameDataToArray(buffer);
-                            doProcess = true;
-                        }
+                        frame.CopyFrameDataToArray(buffer);
+                        doProcess = true;
                     }
-                    if(doProcess) {
-                        for (int i = 0; i < props.Width * props.Height; ++i)
-                        {
-                            double conv = 8000.0 / 256.0;
-                            int newByte = (int)(buffer[i] / conv);
-                            if (newByte >= 0 && newByte <= 255)
-                            {
-                                processedBuffer[i] = (byte)newByte;
-                            }
-                            else
-                            {
-                                processedBuffer[i] = 0;
-                            }
-                        }
-                        //Debug.WriteLine(String.Format("Frame {0}: Got depth {1}", frameTick, buffer[0]));
-                        var fullPath = Path.Combine(recordingPath, "depth", String.Format("shot_{0:D5}.png", depthIdx.frame_idx));
-                        var encoder = new PngBitmapEncoder();
-                        //var depthBitmap = new WriteableBitmap(props.Width, props.Height, 96, 96, PixelFormats.Gray8, null);
+                }
+                 if(doProcess) {
+                    //Action work = () =>
+                    //{
+                    //    var processedBuffer = new byte[props.Width * props.Height];
+                    //    var depthBitmap = new WriteableBitmap(props.Width, props.Height, 96, 96, PixelFormats.Gray8, null);
+
+                    //    for (int i = 0; i < props.Width * props.Height; ++i)
+                    //    {
+                    //        double conv = 8000.0 / 256.0;
+                    //        int newByte = (int)(buffer[i] / conv);
+                    //        if (newByte >= 0 && newByte <= 255)
+                    //        {
+                    //            processedBuffer[i] = (byte)newByte;
+                    //        }
+                    //        else
+                    //        {
+                    //            processedBuffer[i] = 0;
+                    //        }
+                    //    }
+                    //    //Debug.WriteLine(String.Format("Frame {0}: Got depth {1}", frameTick, buffer[0]));
+                    //    var fullPath = Path.Combine(recordingPath, "depth", String.Format("shot_{0:D5}.png", depthIdx.frame_idx));
+                    //    var encoder = new PngBitmapEncoder();
+                    //    //var depthBitmap = new WriteableBitmap(props.Width, props.Height, 96, 96, PixelFormats.Gray8, null);
 
 
-                        depthBitmap.WritePixels(new System.Windows.Int32Rect(0, 0, depthBitmap.PixelWidth, depthBitmap.PixelHeight),
-                            processedBuffer, depthBitmap.PixelWidth, 0);
-                        encoder.Frames.Add(BitmapFrame.Create(depthBitmap));
-                        using (var fs = new FileStream(fullPath, FileMode.Create))
-                        {
-                            encoder.Save(fs);
-                            depthIdx.frame_idx += 1;
-                            if(depthIdx.frame_idx%FlushRate==0)
-                            {
-                                var c1 = depthIdx.frame_start;
-                                var c2 = depthIdx.frame_idx;
-                                var c3 = depthIdx.video_idx;
-                                var encodeTask = Task.Run(() => makeVideo(c1, c2, c3, "depth"));
-                                depthIdx.frame_start += FlushRate;
-                                depthIdx.video_idx += 1;
-                                encoderTasks.Add(encodeTask);
-                            }
-                        }                     
+                    //    depthBitmap.WritePixels(new System.Windows.Int32Rect(0, 0, depthBitmap.PixelWidth, depthBitmap.PixelHeight),
+                    //        processedBuffer, depthBitmap.PixelWidth, 0);
+                    //    encoder.Frames.Add(BitmapFrame.Create(depthBitmap));
+                    //    using (var fs = new FileStream(fullPath, FileMode.Create))
+                    //    {
+                    //        encoder.Save(fs);
+                    //        depthIdx.frame_idx += 1;
+                    //        if (depthIdx.frame_idx % FlushRate == 0)
+                    //        {
+                    //            var c1 = depthIdx.frame_start;
+                    //            var c2 = depthIdx.frame_idx;
+                    //            var c3 = depthIdx.video_idx;
+                    //            var encodeTask = Task.Run(() => makeVideo(c1, c2, c3, "depth"));
+                    //            depthIdx.frame_start += FlushRate;
+                    //            depthIdx.video_idx += 1;
+                    //            encoderTasks.Add(encodeTask);
+                    //        }
+                    //    }
+                    //};
+                    if(depthQueue.Count<5)
+                    {
+                        depthQueue.Add(buffer);
                     }
-                });
+                }
+               
             }
         }
 
@@ -124,53 +151,56 @@ namespace kinect_recorder_gui
             if ((colorFrameTick % Resolution == 0))
             {
                 //var fullPath = Path.Combine(recordingPath, "color", String.Format("shot_{0}_{1:D5}.png", colorFrameTick, colorIdx));
-                var fullPath = Path.Combine(recordingPath, "color", String.Format("shot_{0:D5}.png", colorIdx.frame_idx));
-                Task.Run(() =>
-                {
-                    var colorBitmap = new WriteableBitmap(props.Width, props.Height, 96, 96, PixelFormats.Bgra32, null);
+               
+                    var buffer = new byte[props.Width * props.Height * 4];
                     bool shouldProcess = false;
                     using (var frame = e.FrameReference.AcquireFrame())
                     {
                         if (frame != null)
                         {
                             shouldProcess = true;
-                            colorBitmap.Lock();
-                            if (frame.RawColorImageFormat == ColorImageFormat.Bgra)
-                            {
-                                frame.CopyRawFrameDataToIntPtr(colorBitmap.BackBuffer, (uint)(props.Width * props.Height * 4));
-                            }
-                            else
-                            {
-                                frame.CopyConvertedFrameDataToIntPtr(colorBitmap.BackBuffer, (uint)(props.Width * props.Height * 4), ColorImageFormat.Bgra);
-                            }
-                            colorBitmap.Unlock();
+                            frame.CopyConvertedFrameDataToArray(buffer, ColorImageFormat.Bgra);
                         }
+                    }
 
-                        if (shouldProcess)
-                        {
-                            var colorEncoder = new PngBitmapEncoder();
-                            colorEncoder.Frames.Add(BitmapFrame.Create(colorBitmap));
+                    if (shouldProcess)
+                    {
+                    // Action action = () =>
+                    // {
+                    //     var colorBitmap = new WriteableBitmap(props.Width, props.Height, 96, 96, PixelFormats.Bgra32, null);
+                    //     colorBitmap.WritePixels(new System.Windows.Int32Rect(0, 0, colorBitmap.PixelWidth, colorBitmap.PixelHeight), buffer, 4 * colorBitmap.PixelWidth, 0);
+                    //     var colorEncoder = new PngBitmapEncoder();
+                    //     colorEncoder.Frames.Add(BitmapFrame.Create(colorBitmap));
+                    //     var fullPath = Path.Combine(recordingPath, "color", String.Format("shot_{0:D5}.png", colorIdx.frame_idx));
 
-                            using (var fs = new FileStream(fullPath, FileMode.Create))
-                            {
-                                //var a1 = colorEncoder;
-                                //var a2 = fs;
-                                colorEncoder.Save(fs);
-                                this.colorIdx.frame_idx += 1;
-                                if (colorIdx.frame_idx % FlushRate == 0)
-                                {
-                                    var c1 = colorIdx.frame_start;
-                                    var c2 = colorIdx.frame_idx;
-                                    var c3 = colorIdx.video_idx;
-                                    var encodeTask = Task.Run(() => makeVideo(c1, c2, c3, "color"));
-                                    colorIdx.frame_start += FlushRate;
-                                    colorIdx.video_idx += 1;
-                                    //encoderTasks.Add(encodeTask);
-                                }
-                            }
-                        }
-                    }                                 
-                });
+                    //     using (var fs = new FileStream(fullPath, FileMode.Create))
+                    //     {
+                    //             //var a1 = colorEncoder;
+                    //             //var a2 = fs;
+                    //             colorEncoder.Save(fs);
+                    //         buffer = null;
+                    //         this.colorIdx.frame_idx += 1;
+                    //         if (colorIdx.frame_idx % FlushRate == 0)
+                    //         {
+                    //             var c1 = colorIdx.frame_start;
+                    //             var c2 = colorIdx.frame_idx;
+                    //             var c3 = colorIdx.video_idx;
+                    //             var encodeTask = Task.Run(() => makeVideo(c1, c2, c3, "color"));
+                    //             colorIdx.frame_start += FlushRate;
+                    //             colorIdx.video_idx += 1;
+                    //             encoderTasks.Add(encodeTask);
+                    //         }
+                    //     }
+                    //};
+                    if (colorQueue.Count < 5)
+                    {
+                        BufferForFrame x;
+                        x.buffer = buffer;
+                        x.frame_id = colorFrameTick;
+                        colorQueue.Add(x);
+                    }
+                        //action();
+                }                                                                 
             }
         }
 
@@ -210,6 +240,94 @@ namespace kinect_recorder_gui
             }
         }
 
+        private void WriteDepthFiles()
+        {
+            var props = sensor.DepthFrameSource.FrameDescription;
+            var processedBuffer = new byte[props.Width * props.Height];
+            var depthBitmap = new WriteableBitmap(props.Width, props.Height, 96, 96, PixelFormats.Gray8, null);
+
+            while (true)
+            {
+                var buffer = depthQueue.Take();
+                for (int i = 0; i < props.Width * props.Height; ++i)
+                {
+                    double conv = 8000.0 / 256.0;
+                    int newByte = (int)(buffer[i] / conv);
+                    if (newByte >= 0 && newByte <= 255)
+                    {
+                        processedBuffer[i] = (byte)newByte;
+                    }
+                    else
+                    {
+                        processedBuffer[i] = 0;
+                    }
+                }
+                //Debug.WriteLine(String.Format("Frame {0}: Got depth {1}", frameTick, buffer[0]));
+                var fullPath = Path.Combine(recordingPath, "depth", String.Format("shot_{0:D5}.png", depthIdx.frame_idx));
+                var encoder = new PngBitmapEncoder();
+                //var depthBitmap = new WriteableBitmap(props.Width, props.Height, 96, 96, PixelFormats.Gray8, null);
+
+
+                depthBitmap.WritePixels(new System.Windows.Int32Rect(0, 0, depthBitmap.PixelWidth, depthBitmap.PixelHeight),
+                    processedBuffer, depthBitmap.PixelWidth, 0);
+                encoder.Frames.Add(BitmapFrame.Create(depthBitmap));
+                using (var fs = new FileStream(fullPath, FileMode.Create))
+                {
+                    encoder.Save(fs);
+                    depthIdx.frame_idx += 1;
+                    if (depthIdx.frame_idx % FlushRate == 0)
+                    {
+                        var c1 = depthIdx.frame_start;
+                        var c2 = depthIdx.frame_idx;
+                        var c3 = depthIdx.video_idx;
+                        var encodeTask = Task.Run(() => makeVideo(c1, c2, c3, "depth"));
+                        depthIdx.frame_start += FlushRate;
+                        depthIdx.video_idx += 1;
+                        encoderTasks.Add(encodeTask);
+                    }
+                }
+            }
+        }
+
+        private void WriteColorFiles()
+        {
+            var props = sensor.ColorFrameSource.FrameDescription;
+            var colorBitmap = new WriteableBitmap(props.Width, props.Height, 96, 96, PixelFormats.Bgra32, null);
+            while (true)
+            {
+                var bufferForFrame = colorQueue.Take();
+                var buffer = bufferForFrame.buffer;
+                Debug.Print(String.Format("Queue has {0} elements", colorQueue.Count));
+                colorBitmap.WritePixels(new System.Windows.Int32Rect(0, 0, colorBitmap.PixelWidth, colorBitmap.PixelHeight), buffer, 4 * colorBitmap.PixelWidth, 0);
+                var colorEncoder = new PngBitmapEncoder();
+                colorEncoder.Frames.Add(BitmapFrame.Create(colorBitmap));
+                var fullPath = Path.Combine(recordingPath, "color", String.Format("shot_{0:D5}.png", colorIdx.frame_idx));
+
+                using (var fs = new FileStream(fullPath, FileMode.Create))
+                {
+                    //var a1 = colorEncoder;
+                    //var a2 = fs;
+                    colorEncoder.Save(fs);
+                    buffer = null;
+                    FramePair colorFrame;
+                    colorFrame.file_id = colorIdx.frame_idx;
+                    colorFrame.frame_id = bufferForFrame.frame_id;
+                    colorFrames.Add(colorFrame);
+                    this.colorIdx.frame_idx += 1;
+                    if (colorIdx.frame_idx % FlushRate == 0)
+                    {
+                        var c1 = colorIdx.frame_start;
+                        var c2 = colorIdx.frame_idx;
+                        var c3 = colorIdx.video_idx;
+                        var encodeTask = Task.Run(() => makeVideo(c1, c2, c3, "color"));
+                        colorIdx.frame_start += FlushRate;
+                        colorIdx.video_idx += 1;
+                        encoderTasks.Add(encodeTask);
+                    }
+                }
+            }
+        }
+
         public KinectRecorder()
         {
             this.Resolution = 60;
@@ -217,6 +335,12 @@ namespace kinect_recorder_gui
             this.isRecording = false;
             this.encoderTasks = new List<Task>();
             this.FlushRate = 100;
+            depthQueue = new BlockingCollection<ushort[]>(10);
+            colorQueue = new BlockingCollection<BufferForFrame>(10);
+            depthWriter = new Thread(WriteDepthFiles);
+            colorWriter = new Thread(WriteColorFiles);
+            depthFrames = new List<FramePair>();
+            colorFrames = new List<FramePair>();
         }
 
         public void Initialize()
@@ -232,7 +356,8 @@ namespace kinect_recorder_gui
             var colorProps = sensor.ColorFrameSource.FrameDescription;
             bodyReader = sensor.BodyFrameSource.OpenReader();
             bodyReader.FrameArrived += BodyFrameArrived;
-
+            depthWriter.Start();
+            colorWriter.Start();
 
             sensor.Open();
         }
@@ -332,24 +457,37 @@ namespace kinect_recorder_gui
             }
         }
 
+        void saveColorFrames()
+        {
+            var path = Path.Combine(recordingPath, "color", "frame_correspondance.csv");
+            using (var fs = new StreamWriter(path, true))
+            {
+                fs.WriteLine("file_id, frame_id");
+                foreach (var entry in colorFrames)
+                {
+                    fs.WriteLine(String.Format("{0}, {1}", entry.file_id, entry.frame_id));
+                }
+            }
+        }
+
         public void StopRecording()
         {
             if (!isRecording) return;
             isRecording = false;
             saveHandPoints();
             var c3 = colorIdx.video_idx;
-           // encoderTasks.Add(Task.Run(() => makeVideo(colorIdx.frame_start, colorIdx.frame_idx, c3, "color")));
+            encoderTasks.Add(Task.Run(() => makeVideo(colorIdx.frame_start, colorIdx.frame_idx, c3, "color")));
             var c4 = depthIdx.video_idx;
-           // encoderTasks.Add(Task.Run(() => makeVideo(depthIdx.frame_start, depthIdx.frame_idx, c4, "depth")));
+            encoderTasks.Add(Task.Run(() => makeVideo(depthIdx.frame_start, depthIdx.frame_idx, c4, "depth")));
             colorIdx.video_idx += 1;
             depthIdx.video_idx += 1;
             foreach(var task in encoderTasks)
             {
                 task.Wait();
             }
-            //concatVideo("color");
-            //concatVideo("depth");
- 
+            concatVideo("color");
+            concatVideo("depth");
+            saveColorFrames();
         }
 
         public void Close()
