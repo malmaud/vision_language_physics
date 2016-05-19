@@ -2,6 +2,8 @@
 scratch.jl
 lab\ meeting
 data/
+kinect_recorder_gui/bin
+kinect_recorder_gui/obj
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

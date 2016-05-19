@@ -1,116 +1,126 @@
-using Compat
-using Images
-
-include("types.jl")
-include("annotations.jl")
-include("optical_flow.jl")
-
-function center(d::Detection)
-    Point((d.ul.x+d.lr.x)/2, (d.lr.x+d.lr.y)/2)
+immutable Point
+    x::Int
+    y::Int
 end
 
-function distance(c1::Point, c2::Point)
-    sqrt((c1.x-c2.x)^2 + (c2.y-c1.y)^2)
+immutable Box
+    top_left::Point
+    bottom_right::Point
 end
 
-Images.width(p1::Point, p2::Point) = abs(p2.x - p1.x)
-Images.width(d::Detection) = width(d.ul, d.lr)
+center(b::Box) = Point((b.top_left.x+b.bottom_right.x)//2, (b.bottom_right.y+b.top_left.y)//2)
+compute_distance(b1::Box, b2::Box) = compute_distance(center(b1), center(b2))
 
-distance(d1::Detection, d2::Detection) = distance(center(d1), center(d2))
-
-logistic(x, α, β) = 1 ./ (1+exp(-β*(x-α)))
-
-function motion_coherence_score(distance)
-    α = 50.0
-    β = -1/11
-    logistic(distance, α, β)
+function compute_distance(p1::Point, p2::Point)
+    return sqrt((p1.x-p2.x)^2 + (p1.y-p2.y)^2)
 end
 
-function normed_detector_score(s)
-    α = 1.0
-    β = 2.0
-    logistic(s, α, β)
+immutable VideoData
+    color::Array{Float64, 4}
+    depth::Array{Float64, 3}
+    detections::Vector{Vector{Box}}
+    scores::Vector{Matrix{Float64}}
 end
 
-function score(t::Track, res::DetectorResult)
+const MONKEY_DETECTOR=1
+
+typealias Detections Vector{Vector{Box}}
+
+abstract Predicate
+abstract Word
+
+immutable IsMonkey <: Predicate
+end
+
+immutable IsHand <: Predicate
+end
+
+immutable IsPickUp <: Predicate
+end
+
+immutable IsTrue <: Predicate
+end
+
+immutable IsNear <: Predicate
+end
+
+immutable MonkeyWord <: Word
+end
+
+immutable HandWord <: Word
+end
+
+immutable PickupWord <: Word
+end
+
+const PredicateList = [IsMonkey(), IsHand(), IsPickUp()]
+const WordList = [MonkeyWord(), HandWord(), PickupWord()]
+
+
+#compute_score(p::Predicate, box::Box, data::VideoData)
+#compute_score(p::Predicate, box1::Box, box2::Box, data::VideoData)
+#lookup_predicate(w::Word, state::Int)
+#compute_score(w::Word, state::Int, box::Box, data::VideoData)
+#compute_score(w::Word, state1::Int, state2::Int, data::VideoData)
+
+get_predicate(::MonkeyWord, state_id) = IsMonkey()
+
+function compute_score(::IsMonkey, frame_id, detection_id, data)
+    scores = data.scores
+    return scores[frame_id][detection_id, MONKEY_DETECTOR]  # todo normalize
+end
+
+compute_score(::IsTrue, frame_id, detection_id, data) = 0.0
+
+function compute_score(::IsNear, frame_id, detection_id_1, detection_id_2, data)
+    box1 = data.detections[frame_id][detection_id_1]
+    box2 = data.detections[frame_id][detection_id_2]
+    distance = compute_distance(box1, box2)
+    return distance
+end
+
+function get_predicate(::PickupWord, state_id)
+    if state_id==1
+        return IsTrue()
+    elseif state_id==2
+        return IsNear()
+    elseif state_id==3
+        return IsTrue()
+    end
+end
+
+function compute_score(word::Word, state_id, frame_id, detection_id, data)
+    predicate = get_predicate(word, state_id)
+    return compute_score(predicate, frame_id, detection_id, data)
+end
+
+compute_score(::Word, state1::Int, state2::Int) = 0.0
+
+const AGENT_TRACK = 1
+const PATIENT_TRACK = 2
+
+function compute_score(J::Matrix{Int}, K::Matrix{Int}, track_map::Matrix{Int}, data::VideoData)
     score = 0.0
-    for (frame_id, detection_id) in enumerate(t.detection_ids)
-        detection = res.frames[frame_id].detections[detection_id]
-        score += normed_detector_score(detection.score)
-        if frame_id > 1
-            last_detection = res.frames[frame_id-1].detections[detection_id]
-            score += motion_coherence_score(distance(detection, last_detection))
-        end
-    end
-    score
-end
-
-function does_accept(::FarPredicate, d1::Detection, d2::Detection, params)
-    c1, c2 = center(d1), center(d2)
-    distance = abs(c1.x - c2.x)
-    distance - width(d1)/2 - width(d2)/2 > params.far
-end
-
-function does_accept(::ClosePredicate, d1, d2, params)
-    c1, c2= center(d1), center(d2)
-    distance = abs(c1.x - c2.x)
-    distance - width(d1)/2 - width(d2)/2 < params.close
-end
-
-function does_accept(::LeftOfPredicate, d1, d2, params)
-    c1, c2 = center(d1), center(d2)
-    return c1.x < c2.x + params.pp
-end
-
-function does_accept(::LiftPredicate, d1, params)
-
-end
-
-does_accept(::StationaryPredicate, d1, params) = true
-
-function does_accept(::StationaryButFarPredicate, d1, d2, params)
-    does_accept(FarPredicate, d1, d2, params) &&
-    does_accept(StationaryPredicate, d1, params) &&
-    does_accept(StationaryPredicate, d2, params)
-end
-
-function does_accept(::FromLeftWord, t1::Track, t2::Track, detections, params)
-    needed_frames = 5
-    matched_frames = 0
-    for (frame_id, frame) in detections.frames
-        d1 = frame.detections[t1.detection_ids[frame_id]]
-        d2 = frame.detections[t2.detection_ids[frame_id]]
-        if does_accept(LeftOfPredicate, d1, d2, params)
-            matched_frames += 1
-            if matched_frames ≥ needed_frames
-                return true
+    for word_id in 1:sizeof(K, 1)
+        track_id_1, track_id_2 = track_map[word_id, 1], track_map[word_id, 2]
+        for frame_id in 1:sizeof(K, 2)
+            state_id = K[word_id, frame_id]
+            if track_id_2 == 0
+                detection_id_1 = J[track_id_1, frame_id]
+                score += compute_score(WordList[word_id], state_id, frame_id, detection_id_1, data)
+            else
+                detection_id_1 = J[track_id_1, frame_id]
+                detection_id_2 = J[track_id_2, frame_id]
+                score += compute_score(WordList[word_id], state_id, frame_id, detection_id_1, detection_id_2, data)
             end
-        else
-            matched_frames = 0
+            if frame_id > 1
+                score += compute_score(WordList[word_id], K[word_id, frame_id-1], state_id)
+            end
         end
     end
-    return false
+    return score
 end
 
-function find_track(res::DetectorResult, word::Word)
-end
-
-include("detector.jl")
-
-function load_frames(path)
-    ids = Int[]
-    data = Array{Float64, 3}[]
-    for file in readdir(path)
-        m = match(r".*?(\d+).*", file)
-        if m !== nothing
-            push!(ids, parse(Int, m.captures[1]))
-            push!(data, raw_data(joinpath(path, file)))
-        end
-    end
-    pixel_data = data[sortperm(ids)]
-    flow = Array{Float64,3}[]
-    for i=1:length(ids)-1
-        push!(flow, calc_flow(pixel_data[i], pixel_data[i+1]))
-    end
-    ClipSequence(pixel_data, flow)
+function optimize_score(J, track_map, data)
+    
 end
