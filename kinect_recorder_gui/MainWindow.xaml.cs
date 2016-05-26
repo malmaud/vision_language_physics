@@ -30,6 +30,7 @@ namespace kinect_recorder_gui
             recorder = new KinectRecorder();
             recorder.Initialize();
             recorder.Resolution = 1;
+            recorder.FlushRate = 5000;
             this.directoryText.Text = @"C:\Users\malmaud\Desktop\kinect_shots";
         }
 
