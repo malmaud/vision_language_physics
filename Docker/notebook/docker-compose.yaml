@@ -1,0 +1,10 @@
+version: "2"
+
+services:
+  notebook:
+    build: .
+    image: tensorflow
+    ports:
+      - "1000:8888"
+    volumes:
+      - /notebooks:/Users/malmaud/tmp
