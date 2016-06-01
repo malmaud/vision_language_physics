@@ -9,6 +9,8 @@ Generic function which generally returns a value between 0 and 1 indicate how co
 function get_score
 end
 
+
+
 include("Util.jl")
 include("Scenes.jl")
 include("HMMSolver.jl")
