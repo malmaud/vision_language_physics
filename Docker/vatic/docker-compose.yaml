@@ -1,9 +1,0 @@
-version: "2"
-
-services:
-  vatic:
-    build: .
-    volumes:
-      - /data:/Users/malmaud/tmp
-    ports:
-      - "1001:1000"
