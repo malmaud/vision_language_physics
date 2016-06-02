@@ -7,9 +7,11 @@ export Frame, Box, compute_distance
 
 using Images
 using PyPlot
+using ..Util
 import PyPlot: plot
 using PyCall
 @pyimport matplotlib.patches as patches
+@pyimport cv2
 import Base: +, -
 
 const TRACK_MAP = Dict("right_hand"=>1, "left_hand"=>2, "rat"=>3, "monkey"=>4)
@@ -42,14 +44,14 @@ function plot(box::Box, box_id)
     ax[:add_patch](patches.Rectangle((box.top_left.x, box.top_left.y), box.bottom_right.x-box.top_left.x, box.bottom_right.y-box.top_left.y, fill=false, linewidth=3, edgecolor=color_wheel[mod1(box_id, length(color_wheel))]))
 end
 
-center(b::Box) = Point((b.top_left.x+b.bottom_right.x)//2, (b.bottom_right.y+b.top_left.y)//2)
+center(b::Box) = Point((b.top_left.x+b.bottom_right.x)/2, (b.bottom_right.y+b.top_left.y)/2)
 compute_distance(b1::Box, b2::Box) = compute_distance(center(b1), center(b2))
 
 function compute_distance(p1::Point, p2::Point)
     return sqrt((p1.x-p2.x)^2 + (p1.y-p2.y)^2)
 end
 
-immutable Frame
+type Frame
     boxes::Vector{Box}
     track_ids::Vector{Int}
     optical_flows::Array{Float64, 2}
@@ -59,30 +61,38 @@ Frame(boxes::Vector{Box}) = Frame(boxes, zeros(Int, length(boxes)), zeros(Float6
 Frame() = Frame(Box[])
 
 type Scene
-    color::Nullable{Array{Float64, 4}}
+    color::Nullable{Array{UInt8, 4}}
     depth::Nullable{Array{Float64, 3}}
+    flow::Nullable{Array{Float64, 4}}
     detections::Nullable{Vector{Frame}}
     path::Nullable{String}
 end
 
-Scene() = Scene(Nullable{Array{Float64,4}}(), Nullable{Array{Float64, 3}}(), Nullable{Vector{Frame}}(), Nullable{String}())
+Scene() = Scene(Nullable{Array{UInt8,4}}(), Nullable{Array{Float64, 3}}(), Nullable{Array{Float64, 4}}(), Nullable{Vector{Frame}}(), Nullable{String}())
 
 function load_color_frame(path)
-    im::Images.Image = load(path)
-    raw = convert(Array{Float64}, data(separate(im)))
-    raw
+    raw =  cv2.imread(path)
+    return cv2.cvtColor(raw, cv2.COLOR_BGR2RGB)
 end
 
+
 function plot(scene::Scene, frame_id)
-    isnull(scene.path) && error("Scene doesn't have path information")
-    path = get(scene.path)
+    path = @ifnull scene.path "Scene doesn't have path information"
     frame = load_color_frame(joinpath(path, "color", "image-$frame_id.jpg"))
     imshow(frame)
     if !isnull(scene.detections)
         detections = get(scene.detections)
+        X = Int[]
+        Y = Int[]
         for (box_id, box) in enumerate(detections[frame_id].boxes)
             plot(box, box_id)
+            push!(X, round(Int, center(box).x))
+            push!(Y, round(Int, center(box).y))
         end
+        flows = detections[frame_id].optical_flows
+        flows ./= sqrt(sum(flows.^2, 2))*10
+        quiver(X, Y, flows[:, 1], flows[:, 2])
+
     end
 end
 
@@ -164,20 +174,58 @@ function load_scene(path)
     for frame in 1:n_frames
         push!(detections, Frame())
     end
+
     if isfile(joinpath(path, "hand_points.csv"))
         load_hand_positions(detections, joinpath(path, "hand_points.csv"))
     end
     if isfile(joinpath(path, "annotations.txt"))
         load_annotations(detections, joinpath(path, "annotations.txt"))
     end
-
     scene.detections = Nullable(detections)
+    calc_optical_flow(scene, 10)  # TODO: temporary for debugging purposes
     return scene
 end
-scene = load_scene("/storage/malmaud/kinect/pickup1")
-figure()
 
+function calc_optical_flow(frame1::Array{UInt8, 3}, frame2::Array{UInt8, 3})
+    frame1_im = round(UInt8, mean(frame1, 3))
+    frame2_im = round(UInt8, mean(frame2, 3))
+    flow = cv2.calcOpticalFlowFarneback(frame1_im, frame2_im, .5, 3, 15, 3, 5, 1.2, 0)
+    flow
+end
 
-clf(); plot(scene,400)
+function calc_optical_flow(scene::Scene, max_frames=Inf)
+    frames = @ifnull scene.detections "Must get detections first"
+    path = @ifnull scene.path "Need a path to compute flow"
+    for frame_idx in 1:length(frames)-1
+        frame_idx > max_frames && continue
+        info("Processing $frame_idx of $(min(max_frames, length(frames)-1))")
+        frame = frames[frame_idx]
+        load_img=frame_idx->load_color_frame(joinpath(path, "color", "image-$frame_idx.jpg"))
+        im1 = load_img(frame_idx)
+        im2 = load_img(frame_idx+1)
+        flow = calc_optical_flow(im1, im2)
+        all_flow = Array{Float64}(length(frame.boxes), 2)
+        frame.optical_flows = all_flow
+        for (box_id, box) in enumerate(frame.boxes)
+            p = center(box)
+            f = flow[round(Int, p.y), round(Int, p.x), :]
+            all_flow[box_id, :] = f
+        end
+    end
+end
 
+function show_optical_flow(f1, f2)
+    flow = calc_optical_flow(f1, f2)
+    _, axes = subplots(1,2)
+    sca(axes[1])
+    imshow(flow[:,:,1])
+    title("X flow")
+    sca(axes[2])
+    imshow(flow[:,:,2])
+    title("Y flow")
+end
+
+scene=load_scene("/storage/malmaud/kinect/pickup1")
+close()
+plot(scene, 1)
 end

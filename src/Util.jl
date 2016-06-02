@@ -1,6 +1,6 @@
 module Util
 
-export @not_impl
+export @not_impl, @ifnull
 
 using MacroTools
 
@@ -16,6 +16,13 @@ macro not_impl(expr)
     else
         error("Incorrect syntax for @not_impl")
     end
+end
+
+macro ifnull(e, err)
+    esc(quote
+        isnull($e) && error($err)
+        get($e)
+    end)
 end
 
 end
