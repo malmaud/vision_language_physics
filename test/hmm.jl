@@ -23,6 +23,6 @@ end
 
 @test HMMSolver.get_ml_path(HealthHMM(), [1, 2, 3]) == [1, 1, 2]
 
-lattice = HMMSolver.HMMLattice([HealthHMM()])
+lattice = HMMSolver.HMMLattice([HealthHMM(), HealthHMM()])
 
-HMMSolver.get_ml_path(lattice, [1,2,3])
+@test HMMSolver.get_ml_path(lattice, [1, 2, 3]) == [(1,1), (1,1), (2,2)]
