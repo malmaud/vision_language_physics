@@ -3,7 +3,7 @@ Methods for loading and representing 3D physical scenes/vignettes in terms of tr
 """
 module Scenes
 
-export Frame, Box, compute_distance
+export Frame, Box, compute_distance, TRACK_MAP
 
 using Images
 using PyPlot
@@ -15,6 +15,7 @@ using PyCall
 import Base: +, -
 
 const TRACK_MAP = Dict("right_hand"=>1, "left_hand"=>2, "rat"=>3, "monkey"=>4)
+const MAX_BOXES = 5
 
 immutable Point{T}
     x::T
@@ -41,7 +42,12 @@ plot(box::Box) = plot(box, 1)
 function plot(box::Box, box_id)
     color_wheel = ["red", "green", "blue", "orange", "purple"]
     ax = gca()
-    ax[:add_patch](patches.Rectangle((box.top_left.x, box.top_left.y), box.bottom_right.x-box.top_left.x, box.bottom_right.y-box.top_left.y, fill=false, linewidth=3, edgecolor=color_wheel[mod1(box_id, length(color_wheel))]))
+    # TODO: switch to coloring based on track id instead of box id
+    ax[:add_patch](
+    patches.Rectangle((box.top_left.x, box.top_left.y), box.bottom_right.x-box.top_left.x, box.bottom_right.y-box.top_left.y,
+     fill=false,
+     linewidth=3,
+     edgecolor=color_wheel[mod1(box_id, length(color_wheel))]))
 end
 
 center(b::Box) = Point((b.top_left.x+b.bottom_right.x)/2, (b.bottom_right.y+b.top_left.y)/2)
@@ -55,9 +61,12 @@ type Frame
     boxes::Vector{Box}
     track_ids::Vector{Int}
     optical_flows::Array{Float64, 2}
+    object_scores::Array{Float64, 2}
 end
 
-Frame(boxes::Vector{Box}) = Frame(boxes, zeros(Int, length(boxes)), zeros(Float64, length(boxes), 2))
+OBJECTS = keys(TRACK_MAP)|>collect
+
+Frame(boxes::Vector{Box}) = Frame(boxes, zeros(Int, length(boxes)), zeros(Float64, length(boxes), 2), zeros(Float64, MAX_BOXES, length(OBJECTS)))
 Frame() = Frame(Box[])
 
 type Scene
@@ -122,6 +131,7 @@ function load_annotations(frames, path)
         frame_id = data[row, frame]+1
         push!(frames[frame_id].boxes, box)
         push!(frames[frame_id].track_ids, track_id)
+        frames[frame_id].object_scores[length(frames[frame_id].boxes), track_id] = 1.0
     end
 end
 
@@ -153,6 +163,7 @@ function load_hand_positions(frames::Vector{Frame}, path)
                 bottom_right = Point(pos_x + width/2, pos_y+width/2)
                 push!(frames[frame].boxes, Box(top_left, bottom_right))
                 push!(frames[frame].track_ids, TRACK_MAP[hand])
+                frames[frame].object_scores[length(frames[frame].boxes), TRACK_MAP[hand]] = 1.0
             end
         end
     end
@@ -182,7 +193,7 @@ function load_scene(path)
         load_annotations(detections, joinpath(path, "annotations.txt"))
     end
     scene.detections = Nullable(detections)
-    calc_optical_flow(scene, 10)  # TODO: temporary for debugging purposes
+    calc_optical_flow(scene, 1)  # TODO: temporary for debugging purposes
     return scene
 end
 
@@ -200,7 +211,7 @@ function calc_optical_flow(scene::Scene, max_frames=Inf)
         frame_idx > max_frames && continue
         info("Processing $frame_idx of $(min(max_frames, length(frames)-1))")
         frame = frames[frame_idx]
-        load_img=frame_idx->load_color_frame(joinpath(path, "color", "image-$frame_idx.jpg"))
+        load_img = frame_idx->load_color_frame(joinpath(path, "color", "image-$frame_idx.jpg"))
         im1 = load_img(frame_idx)
         im2 = load_img(frame_idx+1)
         flow = calc_optical_flow(im1, im2)
@@ -225,7 +236,5 @@ function show_optical_flow(f1, f2)
     title("Y flow")
 end
 
-scene=load_scene("/storage/malmaud/kinect/pickup1")
-close()
-plot(scene, 1)
+
 end

@@ -13,18 +13,18 @@ const P=3
 HMMSolver.get_props(::CloseWord) = HMMProps(3)
 
 function HMMSolver.get_transition_matrix(::CloseWord)
-    return [1 1 0; 0 0 1; 0 0 1;]
+    return Float64[1 1 0; 0 0 1; 0 0 1;]
 end
 
 function HMMSolver.get_initial_distribution(::CloseWord)
-    return [1, 0, 0]
+    return Float64[1, 0, 0]
 end
 
 function HMMSolver.get_likelihood(::CloseWord, state_id, obs::Symbol)
     if obs==:CLOSE
-        return [0, 1, 1][state_id]
+        return Float64[0, 1, 1][state_id]
     elseif obs==:NOT_CLOSE
-        return [1, 0, 1][state_id]
+        return Float64[1, 0, 1][state_id]
     end
 end
 
