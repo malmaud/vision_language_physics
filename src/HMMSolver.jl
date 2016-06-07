@@ -84,14 +84,45 @@ function get_likelihood(hmms::HMMLattice, t, state_id, obs)
     # return prod(lhs)
 end
 
+function satisfy_constraint(T1, T, constraint::Int)
+    if constraint==0
+        return indmax(T1[:, T])
+    else
+        return constraint
+    end
+end
+
+immutable LatticeConstraint{T}
+    sizes::NTuple{T, Int}
+    constraint::Int
+end
+
+function satisfy_constraint(T1, T, constraint::LatticeConstraint)
+    sizes = constraint.sizes
+    state_constraint = constraint.constraint
+    cur_max = -Inf
+    cur_max_ind = 0
+    for state in 1:size(T1, 1)
+        state_tuple = ind2sub(sizes, state)
+        if state_tuple[end] == state_constraint
+            if T1[state, T] > cur_max
+                cur_max = T1[state, T]
+                cur_max_ind = state
+            end
+        end
+    end
+    return cur_max_ind
+end
+
 function get_ml_path(hmm::HMM, obs::Vector, constraint=0)
     K = get_props(hmm).n_states
     T = length(obs)
     π = get_initial_distribution(hmm)
     T1 = Array(Float64, K, T)
     T2 = Array(Int, K, T)
+    other_states = Int[]
     for s in 1:K
-        T1[s, 1] = π[s]*get_likelihood(hmm, 1, s, obs[1])
+        T1[s, 1] = π[s]*get_likelihood(hmm, 1, s, obs[1], other_states)
         T2[s, 1] = s
     end
     trans_scores = Array(Float64, K)
@@ -100,18 +131,14 @@ function get_ml_path(hmm::HMM, obs::Vector, constraint=0)
         A = get_transition_matrix(hmm, t-1)
         for s in 1:K
             for s2 in 1:K
-                trans_scores[s2] = T1[s2, t-1] * A[s2, s] * get_likelihood(hmm, 1, s, obs[t])
+                trans_scores[s2] = T1[s2, t-1] * A[s2, s] * get_likelihood(hmm, 1, s, obs[t], other_states)
             end
             T1[s, t] = maximum(trans_scores)
             T2[s, t] = indmax(trans_scores)
         end
     end
     Z = Array(Int, T)
-    if constraint == 0
-        Z[T] = indmax(T1[:, T])
-    else
-        Z[T] = constraint
-    end
+    Z[T] = satisfy_constraint(T1, T, constraint)
     for t in T:-1:2
         Z[t-1] = T2[Z[T], t]
     end
@@ -119,9 +146,11 @@ function get_ml_path(hmm::HMM, obs::Vector, constraint=0)
 end
 
 function get_ml_path(lattice::HMMLattice, obs::Vector, constraint=0)
-    Z_ind = invoke(get_ml_path, (HMM, Vector, Int), lattice, obs, constraint)
-    Z_sub = Vector{NTuple{length(lattice.hmms), Int}}(length(Z_ind))
     n_states = (map(x->get_props(x).n_states, lattice.hmms)...)
+    full_constraint = LatticeConstraint(n_states, constraint)
+    Z_ind = invoke(get_ml_path, (HMM, Vector, Any), lattice, obs, full_constraint)
+    Z_sub = Vector{NTuple{length(lattice.hmms), Int}}(length(Z_ind))
+
     N = prod(n_states)
     for i in 1:length(Z_ind)
         Z_sub[i] = ind2sub(n_states, Z_ind[i])
