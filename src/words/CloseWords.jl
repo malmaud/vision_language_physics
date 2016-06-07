@@ -1,5 +1,7 @@
 module CloseWords
 
+export CloseWord
+
 using ..Words
 using ..HMMSolver
 

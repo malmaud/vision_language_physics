@@ -30,7 +30,11 @@ function HMMSolver.get_transition_matrix(tracker::Tracker, t)
     scene = tracker.scene
     frames = get(scene.detections)
     N_prev = length(frames[t].boxes)
-    N_next = length(frames[t+1].boxes)
+    if t==length(frames)
+        N_next = N_prev
+    else
+        N_next = length(frames[t+1].boxes)
+    end
     N = max_boxes()
     A = zeros(N, N)
     for row in 1:N_prev
@@ -39,7 +43,7 @@ function HMMSolver.get_transition_matrix(tracker::Tracker, t)
                 A[row, col] = 1/N_next
             else
                 box1 = frames[t].boxes[row]
-                box2 = frames[t+1].boxes[col]
+                box2 = frames[t+1].boxes[col]  # TODO use optical flow instead
                 A[row, col] = motion_coherence(box1, box2)
             end
         end

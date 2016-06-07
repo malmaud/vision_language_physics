@@ -22,6 +22,7 @@ HMMProps(;n_states=0) = HMMProps(n_states)
 
 get_transition_matrix(hmm::HMM, t) = get_transition_matrix(hmm)
 get_likelihood(hmm::HMM, t, state, obs) = get_likelihood(hmm, state, obs)
+get_likelihood(hmm::HMM, t, state, obs, lattice_states) = get_likelihood(hmm, t, state, obs)
 
 immutable HMMLattice <: HMM
     hmms::Vector{HMM}
@@ -47,11 +48,11 @@ function get_initial_distribution(hmm::HMMLattice)
     return π_net
 end
 
-function get_transition_matrix(hmm::HMMLattice)
+function get_transition_matrix(hmm::HMMLattice, t)
     n_states = (map(x->get_props(x).n_states, hmm.hmms)...)
     N = prod(n_states)
     A_net = zeros(Float64, N, N)
-    A = map(get_transition_matrix, hmm.hmms)
+    A = map(hmm->get_transition_matrix(hmm, t), hmm.hmms)
     row_idx = 1
     col_idx = 1
     for state1 in CartesianRange(n_states)
@@ -70,12 +71,12 @@ function get_transition_matrix(hmm::HMMLattice)
     return A_net
 end
 
-function get_likelihood(hmms::HMMLattice, state_id, obs)
+function get_likelihood(hmms::HMMLattice, t, state_id, obs)
     n_states = (map(x->get_props(x).n_states, hmms.hmms)...)
     state_ids = ind2sub(n_states, state_id)
     lh = 1.0
     for (hmm, state_id) in zip(hmms.hmms, state_ids)
-        lh *= get_likelihood(hmm, state_id, obs)
+        lh *= get_likelihood(hmm, t, state_id, obs, state_ids)
     end
     return lh
     # lhs = map((hmm, state_id)->get_likelihood(hmm, state_id), zip(hmms.hmms, n_states))
@@ -131,9 +132,9 @@ end
 function score_path(hmm::HMM, states::Vector{Int}, obs::Vector)
     s = 1.0
     π = get_initial_distribution(hmm)
-    B = get_transition_matrix(hmm)
     for t in 1:length(obs)
-        s *= get_likelihood(hmm, states[t], obs[t])
+        B = get_transition_matrix(hmm, t)
+        s *= get_likelihood(hmm, t, states[t], obs[t])
         if t == 1
             s *= π[states[t]]
         else
