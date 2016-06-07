@@ -3,7 +3,7 @@ Methods for loading and representing 3D physical scenes/vignettes in terms of tr
 """
 module Scenes
 
-export Frame, Box, compute_distance, TRACK_MAP
+export Frame, Box, compute_distance, TRACK_MAP, Scene
 
 using Images
 using PyPlot
@@ -169,7 +169,7 @@ function load_hand_positions(frames::Vector{Frame}, path)
     end
 end
 
-function load_scene(path)
+function load_scene(path; max_frames=1)
     ids = Dict{Int, String}()
     for file in readdir(joinpath(path, "color"))
         m = match(r".*?(\d+)\.jpg", file)
@@ -193,7 +193,7 @@ function load_scene(path)
         load_annotations(detections, joinpath(path, "annotations.txt"))
     end
     scene.detections = Nullable(detections)
-    calc_optical_flow(scene, 1)  # TODO: temporary for debugging purposes
+    calc_optical_flow(scene, max_frames)  # TODO: temporary for debugging purposes
     return scene
 end
 

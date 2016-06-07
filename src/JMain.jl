@@ -12,6 +12,7 @@ end
 include("Util.jl")
 include("Scenes.jl")
 include("HMMSolver.jl")
+include("Trackers.jl")
 include("Predicates.jl")
 include("Words.jl")
 
