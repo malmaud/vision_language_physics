@@ -1,4 +1,9 @@
-scene=Scenes.load_scene("/storage/malmaud/kinect/pickup1", max_frames=1)
+#scene=Scenes.load_scene("/storage/malmaud/kinect/pickup1", max_frames=1)
+using JLD
+#save("/storage/malmaud/kinect/pickup1/pickup1.jld", Dict("scene"=>scene))
+
+scene=load("/storage/malmaud/kinect/pickup1/pickup1.jld")["scene"]
+
 scene.detections = Nullable(get(scene.detections)[1:300])
 
 # A right hand is close to a rat
@@ -23,14 +28,8 @@ push!(sentence.words, rat)
 
 path=get_score(scene, sentence)
 
-path
+path.path
 
 p=parse(Sentences.Sentence, "Hi from Jon", port=5007)
 
-p[2]
-using ProtoBuf
 p
-include("../src/sentence_pb.jl")
-readproto(IOBuffer(p[1][1:end]), Sentence)
-
-print(p)
