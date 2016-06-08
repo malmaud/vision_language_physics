@@ -24,7 +24,12 @@ RUN cd $SYNTAXNETDIR/models/syntaxnet \
 
 WORKDIR $SYNTAXNETDIR/models/syntaxnet
 
-CMD [ "sh", "-c", "echo 'Bob brought the pizza to Alice.' | syntaxnet/demo.sh" ]
+ADD service.py /opt/tensorflow/models/syntaxnet/syntaxnet
+ADD conll2tree.py /opt/tensorflow/models/syntaxnet/syntaxnet
+ADD formatter.py /opt/tensorflow/models/syntaxnet/syntaxnet
+RUN chmod +x /opt/tensorflow/models/syntaxnet/syntaxnet/service.py
+#CMD [ "sh", "-c", "echo 'Bob brought the pizza to Alice.' | syntaxnet/demo.sh" ]
+CMD ["sh", "-c", "syntaxnet/service.py"]
 
 # COMMANDS to build and run
 # ===============================

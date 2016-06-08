@@ -15,6 +15,7 @@ include("HMMSolver.jl")
 include("Trackers.jl")
 include("Predicates.jl")
 include("Words.jl")
+include("Sentences.jl")
 
 function load_folder(folder_name)
     word_path = joinpath(dirname(@__FILE__), folder_name)

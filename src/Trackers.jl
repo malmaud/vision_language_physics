@@ -26,7 +26,7 @@ function motion_coherence(box1::Box, box2::Box)
     return sigmoid(compute_distance(box1, box2), 50.0, -1/11)
 end
 
-function HMMSolver.get_transition_matrix(tracker::Tracker, t)
+function HMMSolver.get_transition_matrix!(A, tracker::Tracker, t)
     scene = tracker.scene
     frames = get(scene.detections)
     N_prev = length(frames[t].boxes)
@@ -36,7 +36,7 @@ function HMMSolver.get_transition_matrix(tracker::Tracker, t)
         N_next = length(frames[t+1].boxes)
     end
     N = max_boxes()
-    A = zeros(N, N)
+    # A = zeros(N, N)
     for row in 1:N_prev
         for col in 1:N_next
             if t==length(frames)

@@ -1,3 +1,9 @@
+"""
+Whether two objects are close to each other for a non-trivial amount of time
+in the scene.
+
+eg, "The hand is close to the monkey."
+"""
 module CloseWords
 
 export CloseWord
@@ -8,14 +14,13 @@ using ..Scenes
 using ..ClosePreds
 using ..JMain: get_score
 
-"""
-Whether two objects are close to each other for a non-trivial amount of time
-in the scene.
 
-eg, "The hand is close to the monkey."
-"""
-type CloseWord <: Word{Symbol}
-    scene::Scene
+# type CloseWord <: Word{Symbol}
+#     scene::Scene
+# end
+
+@make_word 2 type CloseWord
+
 end
 
 const F0=1  # Haven't been close yet
@@ -28,8 +33,9 @@ function HMMSolver.get_initial_distribution(word::CloseWord)
     return [1.0, 0.0, 0.0]
 end
 
-function HMMSolver.get_transition_matrix(word::CloseWord)
-    return [0.5 0.5 0; 0 0 1; 0 0 1]
+function HMMSolver.get_transition_matrix!(A::Matrix{Float64}, word::CloseWord)
+    A[:] = [0.5 0.5 0; 0 0 1; 0 0 1]
+    return A
 end
 
 function HMMSolver.get_likelihood(word::CloseWord, t, state_id, obs, box_ids)
@@ -44,7 +50,7 @@ function HMMSolver.get_likelihood(word::CloseWord, t, state_id, obs, box_ids)
             score = max(score, get_score(pred, frames[t], box_ids[1], box_ids[2]))
         end
     else
-        score = get_score(pred, frames[t], box_ids[1], box_ids[2])
+        score = get_score(pred, frames[t], box_ids[word.tracks[1]], box_ids[word.tracks[2]])
     end
     if box_ids[1]==box_ids[2]
         return 0.0
@@ -61,6 +67,8 @@ function HMMSolver.get_likelihood(word::CloseWord, t, state_id, obs, box_ids)
         return 1.0
     end
 end
+
+Words.get_constraint(::CloseWord) = 3
 
 
 

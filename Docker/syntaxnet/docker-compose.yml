@@ -1,0 +1,8 @@
+version: "2"
+
+services:
+  syntaxnet:
+    build: .
+    image: syntaxnet
+    ports:
+      - "5000:1000"

@@ -12,7 +12,7 @@ end
 
 HMMProps(;n_states=0) = HMMProps(n_states)
 
-@not_impl get_transition_matrix(::HMM)
+@not_impl get_transition_matrix!(A::Matrix{Float64}, ::HMM)
 
 @not_impl get_likelihood(::HMM, state_id, obs)
 
@@ -20,7 +20,7 @@ HMMProps(;n_states=0) = HMMProps(n_states)
 
 @not_impl get_initial_distribution(::HMM)
 
-get_transition_matrix(hmm::HMM, t) = get_transition_matrix(hmm)
+get_transition_matrix!(A, hmm::HMM, t) = get_transition_matrix!(A, hmm)
 get_likelihood(hmm::HMM, t, state, obs) = get_likelihood(hmm, state, obs)
 get_likelihood(hmm::HMM, t, state, obs, lattice_states) = get_likelihood(hmm, t, state, obs)
 
@@ -48,11 +48,17 @@ function get_initial_distribution(hmm::HMMLattice)
     return π_net
 end
 
-function get_transition_matrix(hmm::HMMLattice, t)
+
+function get_transition_matrix!(A_net::Matrix{Float64}, hmm::HMMLattice, t)
     n_states = (map(x->get_props(x).n_states, hmm.hmms)...)
     N = prod(n_states)
-    A_net = zeros(Float64, N, N)
-    A = map(hmm->get_transition_matrix(hmm, t), hmm.hmms)
+    # A = map(hmm->get_transition_matrix(hmm, t), hmm.hmms)
+    A = Matrix{Float64}[]
+    for h in hmm.hmms  # TODO avoid doing this step every iteration
+        N_hmm = get_props(h).n_states
+        push!(A, zeros(N_hmm, N_hmm))
+        get_transition_matrix!(A[end], h, t)
+    end
     row_idx = 1
     col_idx = 1
     for state1 in CartesianRange(n_states)
@@ -84,17 +90,29 @@ function get_likelihood(hmms::HMMLattice, t, state_id, obs)
     # return prod(lhs)
 end
 
-function satisfy_constraint(T1, T, constraint::Int)
-    if constraint==0
-        return indmax(T1[:, T])
-    else
-        return constraint
-    end
+immutable ViterbiResult{T}
+    path::T
+    score::Float64
 end
 
-immutable LatticeConstraint{T}
+immutable ConstraintResult
+    index::Int
+    score::Float64
+end
+
+function satisfy_constraint(T1, T, constraint::Int)
+    if constraint==0
+        score, index = findmax(T1[:, T])
+    else
+        index =  constraint
+        score = T1[constraint, T]
+    end
+    return ConstraintResult(index, score)
+end
+
+immutable LatticeConstraint{T, Q}
     sizes::NTuple{T, Int}
-    constraint::Int
+    constraint::NTuple{Q, Int}
 end
 
 function satisfy_constraint(T1, T, constraint::LatticeConstraint)
@@ -104,14 +122,14 @@ function satisfy_constraint(T1, T, constraint::LatticeConstraint)
     cur_max_ind = 0
     for state in 1:size(T1, 1)
         state_tuple = ind2sub(sizes, state)
-        if state_tuple[end] == state_constraint
+        if state_tuple[(end-length(state_constraint)+1):end] == state_constraint
             if T1[state, T] > cur_max
                 cur_max = T1[state, T]
                 cur_max_ind = state
             end
         end
     end
-    return cur_max_ind
+    return ConstraintResult(cur_max_ind, cur_max)
 end
 
 function get_ml_path(hmm::HMM, obs::Vector, constraint=0)
@@ -127,50 +145,55 @@ function get_ml_path(hmm::HMM, obs::Vector, constraint=0)
     end
     trans_scores = Array(Float64, K)
     # A = get_transition_matrix(hmm)
+    A = zeros(K, K)
     for t=2:T
-        A = get_transition_matrix(hmm, t-1)
+        # A = get_transition_matrix(hmm, t-1)
+        get_transition_matrix!(A, hmm, t-1)
         for s in 1:K
+            lh = get_likelihood(hmm, 1, s, obs[t], other_states)
             for s2 in 1:K
-                trans_scores[s2] = T1[s2, t-1] * A[s2, s] * get_likelihood(hmm, 1, s, obs[t], other_states)
+                trans_scores[s2] = T1[s2, t-1] * A[s2, s] * lh
             end
             T1[s, t] = maximum(trans_scores)
             T2[s, t] = indmax(trans_scores)
         end
     end
     Z = Array(Int, T)
-    Z[T] = satisfy_constraint(T1, T, constraint)
+    satisfied_constraint = satisfy_constraint(T1, T, constraint)
+    Z[T] = satisfied_constraint.index
     for t in T:-1:2
         Z[t-1] = T2[Z[T], t]
     end
-    return Z
+    return ViterbiResult(Z, satisfied_constraint.score)
 end
 
-function get_ml_path(lattice::HMMLattice, obs::Vector, constraint=0)
+function get_ml_path(lattice::HMMLattice, obs::Vector, constraint=(0,))
     n_states = (map(x->get_props(x).n_states, lattice.hmms)...)
     full_constraint = LatticeConstraint(n_states, constraint)
-    Z_ind = invoke(get_ml_path, (HMM, Vector, Any), lattice, obs, full_constraint)
+    result = invoke(get_ml_path, (HMM, Vector, Any), lattice, obs, full_constraint)
+    Z_ind = result.path
     Z_sub = Vector{NTuple{length(lattice.hmms), Int}}(length(Z_ind))
 
     N = prod(n_states)
     for i in 1:length(Z_ind)
         Z_sub[i] = ind2sub(n_states, Z_ind[i])
     end
-    return Z_sub
+    return ViterbiResult(Z_sub, result.score)
 end
 
-function score_path(hmm::HMM, states::Vector{Int}, obs::Vector)
-    s = 1.0
-    π = get_initial_distribution(hmm)
-    for t in 1:length(obs)
-        B = get_transition_matrix(hmm, t)
-        s *= get_likelihood(hmm, t, states[t], obs[t])
-        if t == 1
-            s *= π[states[t]]
-        else
-            s *= B[states[t-1], states[t]]
-        end
-    end
-    return s
-end
+# function score_path(hmm::HMM, states::Vector{Int}, obs::Vector)
+#     s = 1.0
+#     π = get_initial_distribution(hmm)
+#     for t in 1:length(obs)
+#         B = get_transition_matrix(hmm, t)
+#         s *= get_likelihood(hmm, t, states[t], obs[t])
+#         if t == 1
+#             s *= π[states[t]]
+#         else
+#             s *= B[states[t-1], states[t]]
+#         end
+#     end
+#     return s
+# end
 
 end
