@@ -1,0 +1,8 @@
+#!/bin/bash
+
+if [ $# -eq 0 ]
+then
+  docker run --rm -v /:/host -it gallium
+else
+  docker run --rm -v /:/host gallium /host/$PWD/$*
+fi

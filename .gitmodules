@@ -1,3 +1,0 @@
-[submodule "Docker/julia"]
-	path = Docker/julia
-	url = https://github.com/malmaud/gallium_docker.git
