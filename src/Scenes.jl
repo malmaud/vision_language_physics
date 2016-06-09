@@ -59,14 +59,13 @@ end
 
 type Frame
     boxes::Vector{Box}
-    track_ids::Vector{Int}
     optical_flows::Array{Float64, 2}
     object_scores::Array{Float64, 2}
 end
 
 OBJECTS = keys(TRACK_MAP)|>collect
 
-Frame(boxes::Vector{Box}) = Frame(boxes, zeros(Int, length(boxes)), zeros(Float64, length(boxes), 2), zeros(Float64, MAX_BOXES, length(OBJECTS)))
+Frame(boxes::Vector{Box}) = Frame(boxes,  zeros(Float64, length(boxes), 2), zeros(Float64, MAX_BOXES, length(OBJECTS)))
 Frame() = Frame(Box[])
 
 type Scene
@@ -123,14 +122,15 @@ function load_annotations(frames, path)
     width_ratio = real_width/turk_width
     height_ratio = real_height/turk_height
     data = readdlm(path)
-
+    already_seen = Set{Tuple{Int, Int}}()  # If multiple annotators labeled the same object and the same frame, only use the first
     for row in 1:size(data, 1)
         track_id = TRACK_MAP[data[row, label]]
         box = Box(Point{Float64}(width_ratio*data[row, xmin], height_ratio*data[row, ymin]),
             Point{Float64}(width_ratio*data[row, xmax], height_ratio*data[row, ymax]))
         frame_id = data[row, frame]+1
+        (frame_id, track_id) ∈ already_seen && continue
+        push!(already_seen, (frame_id, track_id))
         push!(frames[frame_id].boxes, box)
-        push!(frames[frame_id].track_ids, track_id)
         frames[frame_id].object_scores[length(frames[frame_id].boxes), track_id] = 1.0
     end
 end
@@ -156,13 +156,11 @@ function load_hand_positions(frames::Vector{Frame}, path)
         (true_frame ∉ keys(correspondance)) && continue
         frame = correspondance[true_frame]
         frame > length(frames) && continue
-        # frame > length(frames) && continue  # TODO: figure out frame alignment issue
         for (hand, pos_x, pos_y) in [("right_hand", points[row, right_hand_x], points[row, right_hand_y]), ("left_hand", points[row, left_hand_x], points[row, left_hand_y])]
             if isa(pos_x, Number)
                 top_left = Point(pos_x - width/2, pos_y-width/2)
                 bottom_right = Point(pos_x + width/2, pos_y+width/2)
                 push!(frames[frame].boxes, Box(top_left, bottom_right))
-                push!(frames[frame].track_ids, TRACK_MAP[hand])
                 frames[frame].object_scores[length(frames[frame].boxes), TRACK_MAP[hand]] = 1.0
             end
         end
