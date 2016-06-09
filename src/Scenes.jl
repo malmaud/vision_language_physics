@@ -6,9 +6,12 @@ module Scenes
 export Frame, Box, compute_distance, TRACK_MAP, Scene
 
 using Images
-using PyPlot
+try
+    using PyPlot
+    import PyPlot: plot
+end
 using ..Util
-import PyPlot: plot
+
 using PyCall
 @pyimport matplotlib.patches as patches
 @pyimport cv2
