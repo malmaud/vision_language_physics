@@ -5,7 +5,6 @@ module Scenes
 
 export Frame, Box, compute_distance, TRACK_MAP, Scene
 
-using Images
 try
     using PyPlot
     import PyPlot: plot
