@@ -39,6 +39,9 @@ function HMMSolver.get_transition_matrix!(A::Matrix{Float64}, word::CloseWord)
 end
 
 function HMMSolver.get_likelihood(word::CloseWord, t, state_id, obs, box_ids)
+    if t==561
+        @show t, state_id, box_ids
+    end
     pred = ClosePredicate()
     frames = get(word.scene.detections)
     if length(box_ids)<3
@@ -50,21 +53,21 @@ function HMMSolver.get_likelihood(word::CloseWord, t, state_id, obs, box_ids)
             score = max(score, get_score(pred, frames[t], box_ids[1], box_ids[2]))
         end
     else
-        score = get_score(pred, frames[t], box_ids[word.tracks[1]], box_ids[word.tracks[2]])
+        score = get_score(pred, frames[t], box_ids[word.tracks[1]], box_ids[word.tracks[2]]) |> log
     end
     if box_ids[1]==box_ids[2]
-        return 0.0
+        score =  -Inf
     end
-    if state_id==1
+    if state_id==F0
         if t==1 && score==1
-            return 1.0
+            return 0.0
         else
-            return 1-score
+            return log(1-exp(score))
         end
-    elseif state_id==2
+    elseif state_id==F1
         return score
     else
-        return 1.0
+        return 0.0
     end
 end
 

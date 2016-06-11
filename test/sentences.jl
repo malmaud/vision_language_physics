@@ -1,35 +1,41 @@
-#scene=Scenes.load_scene("/storage/malmaud/kinect/pickup1", max_frames=1)
+
+
 using JLD
-#save("/storage/malmaud/kinect/pickup1/pickup1.jld", Dict("scene"=>scene))
 
 scene=load("/storage/malmaud/kinect/pickup1/scene.jld")["scene"]
+sentence=parse(Sentences.Sentence, "A person picks up a rat")
+sentence.words[1] = CloseWords.CloseWord(scene)
+sentence.words[1].tracks=(1,2)
 
-scene.detections = Nullable(get(scene.detections)[1:300])
+res = get_score(scene, sentence)
 
-# A right hand is close to a rat
+res.path
 
-sentence = Sentences.Sentence()
 
-sentence.n_agents=2
+pick_up = PickupWords.PickupWord(scene)
+pick_up.tracks = (1,2)
+left_hand = ObjectWords.ObjectWord(scene)
+left_hand.obj_name=:left_hand
+left_hand.tracks=(1,)
+rat = ObjectWords.ObjectWord(scene)
+rat.obj_name = :rat
+rat.tracks = (2,)
+lattice=HMMSolver.HMMLattice([Trackers.Tracker(scene), Trackers.Tracker(scene), pick_up, left_hand, rat])
 
-hand=ObjectWords.ObjectWord()
-hand.obj_name=:left_hand
-hand.tracks = (1,)
-push!(sentence.words, hand)
+N=HMMSolver.get_props(lattice).n_states
 
-close=CloseWords.CloseWord()
-close.tracks = (1,2)
-push!(sentence.words, close)
+A=zeros(N,N)
 
-rat = ObjectWords.ObjectWord()
-rat.obj_name=:rat
-rat.tracks=(2,)
-push!(sentence.words, rat)
+HMMSolver.get_transition_matrix!(A, lattice, 560)
+for i=70
+    lh = HMMSolver.get_likelihood(lattice, 561, i, 0)
+    @show i, lh
+end
 
-path=get_score(scene, sentence)
 
-path.path
 
-p=parse(Vector{Sentences.Token}, "A person is close to a monkey", port=5000)
+using PyPlot
+using PyCall
+@pyimport seaborn
 
-p[5]
+clf(); seaborn.heatmap(exp(A))

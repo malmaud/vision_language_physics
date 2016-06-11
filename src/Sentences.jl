@@ -1,5 +1,7 @@
 module Sentences
 
+export Sentence, Token
+
 using ..Trackers
 using ..Words
 using ..HMMSolver
@@ -21,7 +23,7 @@ Sentence() = Sentence(Word[], 0)
 function get_score(scene::Scene, sentence::Sentence)
     trackers = Tracker[]
     hmms = HMM[]
-    for agent in 1:sentence.n_agents
+    for agent in 1:sentence.n_tracks
         tracker = Tracker(scene)
         push!(trackers, tracker)
         push!(hmms, tracker)
@@ -105,6 +107,12 @@ function parse(::Type{Sentence}, tokens::Vector{Token}, cur_token_id=0, my_track
         word.obj_name = name_map[stemmed_word]
         word.tracks = (my_track,)
         push!(sentence.words, word)
+    else
+        for (idx, token) in enumerate(tokens)
+            if token.head == cur_token_id
+                parse(Sentence, tokens, idx, my_track, sentence)
+            end
+        end
     end
     return sentence
 end

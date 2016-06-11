@@ -15,11 +15,11 @@ end
 HMMSolver.get_props(::ObjectWord) = HMMProps(n_states=1)
 
 function HMMSolver.get_initial_distribution(::ObjectWord)
-    return [1.0]
+    return log([1.0])
 end
 
 function HMMSolver.get_transition_matrix!(A::Matrix{Float64}, ::ObjectWord)
-    A[1] = 1.0
+    A[1] = log(1.0)
     return A
 end
 

@@ -32,7 +32,7 @@ end
 function HMMSolver.get_likelihood(word::PickupWord, t, state_id, obs, box_ids)
     close_pred = ClosePredicate()
     up_pred = DirectionPredicate([0.0, -1.0])
-    frame = get(word.scene.detections).frames[t]
+    frame = get(word.scene.detections)[t]
     agent, patient = word.tracks
     score = get_score(close_pred, frame, box_ids[agent], box_ids[patient]) *
             get_score(up_pred, frame, box_ids[2])

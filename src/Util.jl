@@ -1,8 +1,9 @@
 module Util
 
-export @not_impl, @ifnull
+export @not_impl, @ifnull, logsumexp
 
 using MacroTools
+using NumericFuns
 
 macro not_impl(expr)
     has_match = @capture expr f_(args__)
@@ -23,6 +24,10 @@ macro ifnull(e, err)
         isnull($e) && error($err)
         get($e)
     end)
+end
+
+function NumericFuns.logsumexp(x::Vector{Float64})
+    reduce(logsumexp, x)
 end
 
 end
