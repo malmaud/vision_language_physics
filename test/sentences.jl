@@ -2,7 +2,7 @@
 using JLD
 #save("/storage/malmaud/kinect/pickup1/pickup1.jld", Dict("scene"=>scene))
 
-scene=load("/storage/malmaud/kinect/pickup1/pickup1.jld")["scene"]
+scene=load("/storage/malmaud/kinect/pickup1/scene.jld")["scene"]
 
 scene.detections = Nullable(get(scene.detections)[1:300])
 
@@ -30,6 +30,6 @@ path=get_score(scene, sentence)
 
 path.path
 
-p=parse(Sentences.Sentence, "Hi from Jon", port=5007)
+p=parse(Vector{Sentences.Token}, "A person is close to a monkey", port=5000)
 
-p
+p[5]

@@ -5,10 +5,15 @@ using ..Words
 using ..HMMSolver
 using ..Scenes
 import ..JMain: get_score
+import Base: parse
+using ..PickupWords
+using ..ObjectWords
+using PyCall
+@pyimport nltk.stem.porter as porter
 
 type Sentence
     words::Vector{Word}
-    n_agents::Int
+    n_tracks::Int
 end
 
 Sentence() = Sentence(Word[], 0)
@@ -45,7 +50,7 @@ immutable Token
 end
 
 
-function Base.parse(::Type{Sentence}, query::String; port = 5000)
+function parse(::Type{Vector{Token}}, query::String; port::Int = 5000)
     sentence = Sentence()
     socket = connect(port)
     write(socket, length(query.data))
@@ -62,6 +67,46 @@ function Base.parse(::Type{Sentence}, query::String; port = 5000)
     return tokens
 end
 
+function parse(::Type{Sentence}, query::String; kwargs...)
+    tokens = parse(Vector{Token}, query; kwargs...)
+    return parse(Sentence, tokens)
+end
 
+function parse(::Type{Sentence}, tokens::Vector{Token}, cur_token_id=0, my_track=0, sentence=Sentence())
+    if cur_token_id == 0
+        cur_token_id = findfirst([token.head==0 for token in tokens])
+    end
+    cur_token = tokens[cur_token_id]
+    name_map = Dict("person"=>:left_hand, "monkey"=>:monkey, "rat"=>:rat)
+    stemmer = porter.PorterStemmer()
+    stemmed_word = stemmer[:stem](cur_token.word)
+    if stemmed_word == "pick"
+        agent = sentence.n_tracks + 1
+        patient = sentence.n_tracks + 2
+        word = PickupWord()
+        word.tracks = (agent, patient)
+        push!(sentence.words, word)
+        sentence.n_tracks += 2
+        for (idx, token) in enumerate(tokens)
+            if token.head == cur_token_id
+                if token.label == "dobj"
+                    parse(Sentence, tokens, idx, patient, sentence)
+                elseif token.label == "nsubj"
+                    parse(Sentence, tokens, idx, agent, sentence)
+                end
+            end
+        end
+    elseif stemmed_word ∈ keys(name_map)
+        if my_track == 0
+            my_track = sentence.n_tracks + 1
+            sentence.n_tracks += 1
+        end
+        word = ObjectWord()
+        word.obj_name = name_map[stemmed_word]
+        word.tracks = (my_track,)
+        push!(sentence.words, word)
+    end
+    return sentence
+end
 
 end
