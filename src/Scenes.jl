@@ -211,7 +211,9 @@ function calc_optical_flow(scene::Scene, max_frames=Inf)
         frame_idx > max_frames && continue
         info("Processing $frame_idx of $(min(max_frames, length(frames)-1))")
         frame = frames[frame_idx]
-        load_img = frame_idx->load_color_frame(joinpath(path, "color", "image-$frame_idx.jpg"))
+        img_name = @sprintf("output%03d.jpg", frame_idx)
+        full_img_name = joinpath(path, "color", "frames", img_name)
+        load_img = frame_idx->load_color_frame(full_img_name)
         im1 = load_img(frame_idx)
         im2 = load_img(frame_idx+1)
         flow = calc_optical_flow(im1, im2)
