@@ -165,7 +165,7 @@ function get_depth(x, y, depth_path, frame_idx)
     depth_x = round(Int, x/real_width*depth_width)
     depth_y = round(Int, y/real_height*depth_height)
     z = frame[depth_y, depth_x, 1] |> Int # opencv inverts the width, height dimensions
-    return Point(x, y, z)
+    return Point(clamp(x, 1, REAL_WIDTH) , clamp(y, 1, REAL_HEIGHT), clamp(z, 0, 256))
 end
 
 function load_hand_positions(frames::Vector{Frame}, path)
