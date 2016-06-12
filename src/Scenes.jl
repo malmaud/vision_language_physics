@@ -104,7 +104,8 @@ end
 
 function plot(scene::Scene, frame_id)
     path = @ifnull scene.path "Scene doesn't have path information"
-    frame = load_color_frame(joinpath(path, "color", "image-$frame_id.jpg"))
+    filename = @sprintf("output%03d.jpg", frame_id)
+    frame = load_color_frame(joinpath(path, "color", "frames", filename))
     imshow(frame)
     if !isnull(scene.detections)
         detections = get(scene.detections)

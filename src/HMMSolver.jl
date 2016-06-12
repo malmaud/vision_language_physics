@@ -84,7 +84,6 @@ function get_likelihood(hmms::HMMLattice, t, state_id, obs)
     lh = 0.0
     for (hmm, state_id) in zip(hmms.hmms, state_ids)
         state_lh = get_likelihood(hmm, t, state_id, obs, state_ids)
-        @show state_id, state_lh
         lh += state_lh
     end
     return lh

@@ -25,23 +25,22 @@ end
 
 const F0=1  # Haven't been close yet
 const F1=2  # Have been close on this frame
-const P=3  # Have been close at least one frame in the video so far
+const F2=3
+const F3=4
+const P=5  # Have been close at least one frame in the video so far
 
-HMMSolver.get_props(::CloseWord) = HMMProps(n_states=3)
+HMMSolver.get_props(::CloseWord) = HMMProps(n_states=5)
 
 function HMMSolver.get_initial_distribution(word::CloseWord)
-    return [1.0, 0.0, 0.0]
+    return log([1.0, 0.0, 0.0, 0.0, 0.0])
 end
 
 function HMMSolver.get_transition_matrix!(A::Matrix{Float64}, word::CloseWord)
-    A[:] = [0.5 0.5 0; 0 0 1; 0 0 1]
+    A[:] = log([0.5 0.5 0 0 0; .5 0 .5 0 0; .5 0 0 .5 0; .5 0 0 0 .5; 0 0 0 0 1])
     return A
 end
 
 function HMMSolver.get_likelihood(word::CloseWord, t, state_id, obs, box_ids)
-    if t==561
-        @show t, state_id, box_ids
-    end
     pred = ClosePredicate()
     frames = get(word.scene.detections)
     if length(box_ids)<3
@@ -58,20 +57,20 @@ function HMMSolver.get_likelihood(word::CloseWord, t, state_id, obs, box_ids)
     if box_ids[1]==box_ids[2]
         score =  -Inf
     end
-    if state_id==F0
+    if state_id == F0
         if t==1 && score==1
-            return 0.0
+            return log(1.0)
         else
-            return log(1-exp(score))
+            return log(1-exp(score))  # 1-P
         end
-    elseif state_id==F1
+    elseif state_id ∈ F1:F3
         return score
-    else
+    else  # state_id == P
         return 0.0
     end
 end
 
-Words.get_constraint(::CloseWord) = 3
+Words.get_constraint(::CloseWord) = 5
 
 
 
