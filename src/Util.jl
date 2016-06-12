@@ -1,6 +1,6 @@
 module Util
 
-export @not_impl, @ifnull, logsumexp
+export @not_impl, @ifnull, logsumexp, clip
 
 using MacroTools
 using NumericFuns
@@ -28,6 +28,12 @@ end
 
 function NumericFuns.logsumexp(x::Vector{Float64})
     reduce(logsumexp, x)
+end
+
+function clip(x, lb, ub)
+    x<lb && return lb
+    x>ub && return ub
+    return x
 end
 
 end
