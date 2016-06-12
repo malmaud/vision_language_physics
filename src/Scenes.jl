@@ -162,8 +162,9 @@ end
 
 function get_depth(x, y, depth_path, frame_idx)
     frame = load_depth_frame(joinpath(depth_path, @sprintf("output%03d.jpg", frame_idx)))
-    depth_x = round(Int, x/real_width*depth_width)
-    depth_y = round(Int, y/real_height*depth_height)
+    depth_x = clamp(round(Int, x/real_width*depth_width), 1, depth_width)
+    depth_y = clamp(round(Int, y/real_height*depth_height), 1, depth_height)
+
     z = frame[depth_y, depth_x, 1] |> Int # opencv inverts the width, height dimensions
     return Point(clamp(x, 1, real_width) , clamp(y, 1, real_height), clamp(z, 0, 256))
 end
