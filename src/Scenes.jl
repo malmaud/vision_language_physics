@@ -171,7 +171,7 @@ end
 
 function load_scene(path; max_frames=1)
     ids = Dict{Int, String}()
-    for file in readdir(joinpath(path, "color"))
+    for file in readdir(joinpath(path, "color/frames"))
         m = match(r".*?(\d+)\.jpg", file)
         if m !== nothing
             id = m.captures[1]
