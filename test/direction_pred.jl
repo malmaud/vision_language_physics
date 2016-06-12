@@ -13,3 +13,4 @@ frames=get(scene.detections)
 using PyPlot
 
 clf(); plot(scene,1)
+frames[1].optical_flows

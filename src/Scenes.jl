@@ -168,6 +168,7 @@ function get_depth(x, y, depth_path, frame_idx)
 
     z = frame[depth_y, depth_x, 1] |> Int # opencv inverts the width, height dimensions
     return Point(clamp(x, 1, real_width) , clamp(y, 1, real_height), clamp(z, 0, 256))
+    # return Point(x, y, z)
 end
 
 function load_hand_positions(frames::Vector{Frame}, path)
@@ -245,9 +246,9 @@ function calc_optical_flow(scene::Scene, max_frames=Inf)
         frame_idx > max_frames && continue
         info("Processing $frame_idx of $(min(max_frames, length(frames)-1))")
         frame = frames[frame_idx]
-        img_name = @sprintf("output%03d.jpg", frame_idx)
-        full_img_name = joinpath(path, "color", "frames", img_name)
-        load_img = frame_idx->load_color_frame(full_img_name)
+        img_name = frame_idx->@sprintf("output%03d.jpg", frame_idx)
+        full_img_name = frame_idx->joinpath(path, "color", "frames", img_name(frame_idx))
+        load_img = frame_idx->load_color_frame(full_img_name(frame_idx))
         im1 = load_img(frame_idx)
         im2 = load_img(frame_idx+1)
         flow = calc_optical_flow(im1, im2)
@@ -255,7 +256,7 @@ function calc_optical_flow(scene::Scene, max_frames=Inf)
         frame.optical_flows = all_flow
         for (box_id, box) in enumerate(frame.boxes)
             p = center(box)
-            f = flow[clamp(round(Int, p.y), 1, 1080), clamp(round(Int, p.x), 1, 1920), :]  # TODO doublecheck these clamp numbers aren't backwards
+            f = flow[clamp(round(Int, p.y), 1, 1920), clamp(round(Int, p.x), 1, 1080), :]  # TODO doublecheck these clamp numbers aren't backwards
             all_flow[box_id, :] = f
         end
     end
