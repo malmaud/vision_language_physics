@@ -22,12 +22,18 @@ const MAX_BOXES = 5
 immutable Point{T}
     x::T
     y::T
+    z::T
 end
 
-Point(x, y) = Point(promote(x, y)...)
+function Base.show(io::IO, p::Point)
+    print(io, @sprintf("Point(%.1f, %.1f, %.1f)", p.x, p.y, p.z))
+end
+
+Point(x, y, z) = Point(promote(x, y, z)...)
+Point(x, y) = Point(x, y, 0.0)
 
 for op in [:-, :+]
-    @eval $op(p1::Point, p2::Point) = Point($op(p1.x, p2.x), $op(p1.y, p2.y))
+    @eval $op(p1::Point, p2::Point) = Point($op(p1.x, p2.x), $op(p1.y, p2.y), $op(p1.z, p2.z))
 end
 
 immutable Box
@@ -36,27 +42,25 @@ immutable Box
 end
 
 function Base.show(io::IO, box::Box)
-    print(io, @sprintf("(%.2f, %.2f, %.2f, %.2f)", box.top_left.x, box.top_left.y, box.bottom_right.x, box.bottom_right.y))
+    print(io, @sprintf("(%.2f, %.2f, %.2f, %.2f, %.2f, %.2f)", box.top_left.x, box.top_left.y, box.top_left.z, box.bottom_right.x, box.bottom_right.y, box.bottom_right.z))
 end
 
-plot(box::Box) = plot(box, 1)
-
-function plot(box::Box, box_id)
+function plot(box::Box, box_id=1)
     color_wheel = ["red", "green", "blue", "orange", "purple"]
     ax = gca()
     # TODO: switch to coloring based on track id instead of box id
     ax[:add_patch](
     patches.Rectangle((box.top_left.x, box.top_left.y), box.bottom_right.x-box.top_left.x, box.bottom_right.y-box.top_left.y,
      fill=false,
-     linewidth=3,
+     linewidth=round(Int, box.top_left.z/255*10),
      edgecolor=color_wheel[mod1(box_id, length(color_wheel))]))
 end
 
-center(b::Box) = Point((b.top_left.x+b.bottom_right.x)/2, (b.bottom_right.y+b.top_left.y)/2)
+center(b::Box) = Point((b.top_left.x+b.bottom_right.x)/2, (b.bottom_right.y+b.top_left.y)/2, (b.bottom_right.z+b.top_left.z)/2)
 compute_distance(b1::Box, b2::Box) = compute_distance(center(b1), center(b2))
 
 function compute_distance(p1::Point, p2::Point)
-    return sqrt((p1.x-p2.x)^2 + (p1.y-p2.y)^2)
+    return sqrt((p1.x-p2.x)^2 + (p1.y-p2.y)^2 + (p1.z-p2.z)^2)
 end
 
 type Frame
@@ -78,6 +82,14 @@ type Scene
     path::Nullable{String}
 end
 
+function Base.show(io::IO, scene::Scene)
+    if !isnull(scene.path)
+        print(io, "Scene($(get(scene.path)))")
+    else
+        print(io, "Scene")
+    end
+end
+
 Scene() = Scene(Nullable{Array{UInt8,4}}(), Nullable{Array{Float64, 3}}(), Nullable{Array{Float64, 4}}(), Nullable{Vector{Frame}}(), Nullable{String}())
 
 function load_color_frame(path)
@@ -85,6 +97,10 @@ function load_color_frame(path)
     return cv2.cvtColor(raw, cv2.COLOR_BGR2RGB)
 end
 
+function load_depth_frame(path)
+    raw = cv2.imread(path)
+    return raw
+end
 
 function plot(scene::Scene, frame_id)
     path = @ifnull scene.path "Scene doesn't have path information"
@@ -102,9 +118,15 @@ function plot(scene::Scene, frame_id)
         flows = detections[frame_id].optical_flows
         flows ./= sqrt(sum(flows.^2, 2))*10
         quiver(X, Y, flows[:, 1], flows[:, 2])
-
     end
 end
+
+const turk_width = 720
+const turk_height = 405
+const depth_width = 512
+const depth_height = 424
+const real_width = 1920
+const real_height = 1080
 
 function load_annotations(frames, path)
     const track_id=1
@@ -117,24 +139,33 @@ function load_annotations(frames, path)
     const occluded=8
     const generated=9
     const label=10
-    const turk_width = 720
-    const turk_height = 405
-    const real_width = 1920
-    const real_height = 1080
+
     width_ratio = real_width/turk_width
     height_ratio = real_height/turk_height
     data = readdlm(path)
     already_seen = Set{Tuple{Int, Int}}()  # If multiple annotators labeled the same object and the same frame, only use the first
+    depth_path = joinpath(dirname(path), "depth", "frames")
     for row in 1:size(data, 1)
         track_id = TRACK_MAP[data[row, label]]
-        box = Box(Point{Float64}(min(real_width, width_ratio*data[row, xmin]), min(real_height, height_ratio*data[row, ymin])),
-            Point{Float64}(min(real_width, width_ratio*data[row, xmax]), min(real_height, height_ratio*data[row, ymax])))
         frame_id = data[row, frame]+1
+        get_point = (ratio, x, y) -> get_depth(ratio*x, ratio*y, depth_path, frame_id)
+        ul = get_point(width_ratio, data[row, xmin], data[row, ymin])
+        lr = get_point(height_ratio, data[row, xmax], data[row, ymax])
+        box = Box(ul, lr)
+
         (frame_id, track_id) ∈ already_seen && continue
         push!(already_seen, (frame_id, track_id))
         push!(frames[frame_id].boxes, box)
         frames[frame_id].object_scores[length(frames[frame_id].boxes), track_id] = 1.0
     end
+end
+
+function get_depth(x, y, depth_path, frame_idx)
+    frame = load_depth_frame(joinpath(depth_path, @sprintf("output%03d.jpg", frame_idx)))
+    depth_x = round(Int, x/real_width*depth_width)
+    depth_y = round(Int, y/real_height*depth_height)
+    z = frame[depth_y, depth_x, 1] |> Int # opencv inverts the width, height dimensions
+    return Point(x, y, z)
 end
 
 function load_hand_positions(frames::Vector{Frame}, path)
@@ -148,6 +179,7 @@ function load_hand_positions(frames::Vector{Frame}, path)
 
     points = readcsv(path)
     correspondance_file = joinpath(dirname(path), "color", "frame_correspondance.csv") |> readcsv
+    depth_path = joinpath(dirname(path), "depth", "frames")
     correspondance = Dict{Int, Int}()
     for row in 2:size(correspondance_file, 1)
         correspondance[correspondance_file[row, 2]] = correspondance_file[row, 1] + 1
@@ -160,8 +192,8 @@ function load_hand_positions(frames::Vector{Frame}, path)
         frame > length(frames) && continue
         for (hand, pos_x, pos_y) in [("right_hand", points[row, right_hand_x], points[row, right_hand_y]), ("left_hand", points[row, left_hand_x], points[row, left_hand_y])]
             if isa(pos_x, Number)
-                top_left = Point(pos_x - width/2, pos_y-width/2)
-                bottom_right = Point(pos_x + width/2, pos_y+width/2)
+                top_left = get_depth(pos_x - width/2, pos_y-width/2, depth_path, frame)
+                bottom_right = get_depth(pos_x + width/2, pos_y+width/2, depth_path, frame)
                 push!(frames[frame].boxes, Box(top_left, bottom_right))
                 frames[frame].object_scores[length(frames[frame].boxes), TRACK_MAP[hand]] = 1.0
             end
