@@ -127,8 +127,8 @@ function load_annotations(frames, path)
     already_seen = Set{Tuple{Int, Int}}()  # If multiple annotators labeled the same object and the same frame, only use the first
     for row in 1:size(data, 1)
         track_id = TRACK_MAP[data[row, label]]
-        box = Box(Point{Float64}(width_ratio*data[row, xmin], height_ratio*data[row, ymin]),
-            Point{Float64}(width_ratio*data[row, xmax], height_ratio*data[row, ymax]))
+        box = Box(Point{Float64}(min(real_width, width_ratio*data[row, xmin]), min(real_height, height_ratio*data[row, ymin])),
+            Point{Float64}(min(real_width, width_ratio*data[row, xmax]), min(real_height, height_ratio*data[row, ymax])))
         frame_id = data[row, frame]+1
         (frame_id, track_id) ∈ already_seen && continue
         push!(already_seen, (frame_id, track_id))
@@ -221,7 +221,7 @@ function calc_optical_flow(scene::Scene, max_frames=Inf)
         frame.optical_flows = all_flow
         for (box_id, box) in enumerate(frame.boxes)
             p = center(box)
-            f = flow[round(Int, p.y), round(Int, p.x), :]
+            f = flow[min(1080, round(Int, p.y)), min(1920, round(Int, p.x)), :]
             all_flow[box_id, :] = f
         end
     end
