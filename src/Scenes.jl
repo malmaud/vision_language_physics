@@ -221,7 +221,7 @@ function calc_optical_flow(scene::Scene, max_frames=Inf)
         frame.optical_flows = all_flow
         for (box_id, box) in enumerate(frame.boxes)
             p = center(box)
-            f = flow[clip(round(Int, p.y), 1, 1080), clip(round(Int, p.x), 1, 1920), :]
+            f = flow[clamp(round(Int, p.y), 1, 1080), clamp(round(Int, p.x), 1, 1920), :]  # TODO doublecheck these clamp numbers aren't backwards
             all_flow[box_id, :] = f
         end
     end
