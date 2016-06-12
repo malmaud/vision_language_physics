@@ -1,6 +1,6 @@
 using .DirectionPreds
 
-pred=DirectionPredicate([-1.0, 0.0])
+pred=DirectionPredicate([1.0, 0.0])
 
 pred
 
@@ -14,3 +14,5 @@ using PyPlot
 
 clf(); plot(scene,1)
 frames[1].optical_flows
+
+get_score(pred, frames[1], 2)
