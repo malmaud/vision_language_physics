@@ -8,7 +8,7 @@ using ..HMMSolver
 using ..Scenes
 import ..JMain: get_score
 import Base: parse
-using ..PickupWords
+using ..MoveWords
 using ..ObjectWords
 using PyCall
 @pyimport nltk.stem.porter as porter
@@ -74,6 +74,17 @@ function parse(::Type{Sentence}, query::String; kwargs...)
     return parse(Sentence, tokens)
 end
 
+function word_for_verb(verb)
+    if verb == "pick"
+        word = MoveWord()
+        word.dir = [0.0, 1.0]
+    elseif verb == "put"
+        word = MoveWord()
+        word.dir = [0.0, -1.0]
+    end
+    return word
+end
+
 function parse(::Type{Sentence}, tokens::Vector{Token}, cur_token_id=0, my_track=0, sentence=Sentence())
     if cur_token_id == 0
         cur_token_id = findfirst([token.head==0 for token in tokens])
@@ -82,10 +93,13 @@ function parse(::Type{Sentence}, tokens::Vector{Token}, cur_token_id=0, my_track
     name_map = Dict("person"=>:left_hand, "monkey"=>:monkey, "rat"=>:rat)
     stemmer = porter.PorterStemmer()
     stemmed_word = stemmer[:stem](cur_token.word)
-    if stemmed_word == "pick"
+    const transitive_verbs = ["pick", "put"]
+    if stemmed_word ∈ transitive_verbs
         agent = sentence.n_tracks + 1
         patient = sentence.n_tracks + 2
-        word = PickupWord()
+        word = word_for_verb(stemmed_word)
+        # word = MoveWord()
+        # word.dir = [0.0, 1.0]
         word.tracks = (agent, patient)
         push!(sentence.words, word)
         sentence.n_tracks += 2

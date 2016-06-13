@@ -1,6 +1,6 @@
-module PickupWords
+module MoveWords
 
-export PickupWord
+export MoveWord
 
 using ..Words
 using ..HMMSolver
@@ -10,7 +10,8 @@ using ..DirectionPreds
 using ..JMain: get_score
 using ..GeoRelationPreds
 
-@make_word 2 type PickupWord
+@make_word 2 type MoveWord
+    dir::Vector{Float64}
 end
 
 const F0=1
@@ -19,21 +20,21 @@ const F2=3
 const F3=4
 const P=5
 
-Words.get_constraint(::PickupWord) = 5
-HMMSolver.get_props(::PickupWord) = HMMProps(n_states=5)
+Words.get_constraint(::MoveWord) = 5
+HMMSolver.get_props(::MoveWord) = HMMProps(n_states=5)
 
-function HMMSolver.get_initial_distribution(word::PickupWord)
+function HMMSolver.get_initial_distribution(word::MoveWord)
     return log(Float64[1, 0, 0, 0, 0])
 end
 
-function HMMSolver.get_transition_matrix!(A::Matrix{Float64}, word::PickupWord)
+function HMMSolver.get_transition_matrix!(A::Matrix{Float64}, word::MoveWord)
     A[:] = log(Float64[.5 .5 0 0 0;.5 0 .5 0 0;.5 0 0 .5 0;.5 0 0 0 .5;0 0 0 0 1])
 end
 
-function HMMSolver.get_likelihood(word::PickupWord, t, state_id, obs, box_ids)
+function HMMSolver.get_likelihood(word::MoveWord, t, state_id, obs, box_ids)
     close_pred = ClosePredicate()
     # up_pred = DirectionPredicate([0.0, -1.0])
-    up_pred = DirectionPredicate([0.0, 1.0])
+    up_pred = DirectionPredicate(word.dir)
     frame = get(word.scene.detections)[t]
     agent, patient = word.tracks
     above_pred = GeoRelationPredicate(GeoRelationPreds.Above)
