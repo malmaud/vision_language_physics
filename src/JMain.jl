@@ -27,5 +27,6 @@ end
 foreach(load_folder, ["predicates", "words"])
 
 include("Sentences.jl")
+include("Visualizer.jl")
 
 end

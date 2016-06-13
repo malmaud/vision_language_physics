@@ -8,6 +8,7 @@ using ..Scenes
 using ..ClosePreds
 using ..DirectionPreds
 using ..JMain: get_score
+using ..GeoRelationPreds
 
 @make_word 2 type PickupWord
 end
@@ -31,11 +32,13 @@ end
 
 function HMMSolver.get_likelihood(word::PickupWord, t, state_id, obs, box_ids)
     close_pred = ClosePredicate()
-    up_pred = DirectionPredicate([0.0, -1.0])
+    # up_pred = DirectionPredicate([0.0, -1.0])
+    up_pred = DirectionPredicate([0.0, 1.0])
     frame = get(word.scene.detections)[t]
     agent, patient = word.tracks
+    above_pred = GeoRelationPredicate(GeoRelationPreds.Above)
     score = get_score(close_pred, frame, box_ids[agent], box_ids[patient]) *
-            get_score(up_pred, frame, box_ids[2])
+            get_score(up_pred, frame, box_ids[agent]) * get_score(up_pred, frame, box_ids[patient]) * get_score(above_pred, frame, box_ids[agent], box_ids[patient])
     score = log(score)
     if state_id == F0
         return log(.5)

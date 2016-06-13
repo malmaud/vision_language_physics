@@ -4,12 +4,20 @@ using JLD
 
 scene=load("/storage/malmaud/kinect/pickup1/scene.jld")["scene"]
 sentence=parse(Sentences.Sentence, "A person picks up a rat")
-sentence.words[1] = CloseWords.CloseWord(scene)
-sentence.words[1].tracks=(1,2)
+# sentence.words[1] = CloseWords.CloseWord(scene)
+# sentence.words[1].tracks=(1,2)
 
 res = get_score(scene, sentence)
+using PyPlot
+clf();plot(scene, res, sentence)
 res.score
-res.path
+findfirst([_[3]==4 for _ in res.path])
+res.path[134]
+frames=get(scene.detections)
+frames[134].optical_flows[2,:]
+d=DirectionPreds.DirectionPredicate([0,1.0])
+get_score(d, frames[134], 3)
+clf();plot(scene, 134)
 for i in 1:size(res.T1, 1)
     x=find(res.T1[:,i].>-Inf)
     if isempty(x)

@@ -102,7 +102,7 @@ function load_depth_frame(path)
     return raw
 end
 
-function plot(scene::Scene, frame_id)
+function plot(scene::Scene, frame_id::Int; show_boxes=true, show_flow=true)
     path = @ifnull scene.path "Scene doesn't have path information"
     filename = @sprintf("output%03d.jpg", frame_id)
     frame = load_color_frame(joinpath(path, "color", "frames", filename))
@@ -112,13 +112,17 @@ function plot(scene::Scene, frame_id)
         X = Int[]
         Y = Int[]
         for (box_id, box) in enumerate(detections[frame_id].boxes)
-            plot(box, box_id)
+            if show_boxes
+                plot(box, box_id)
+            end
             push!(X, round(Int, center(box).x))
             push!(Y, round(Int, center(box).y))
         end
         flows = detections[frame_id].optical_flows
         flows ./= sqrt(sum(flows.^2, 2))*10
-        quiver(X, Y, flows[:, 1], flows[:, 2])
+        if show_flow
+            quiver(X, Y, flows[:, 1], flows[:, 2])
+        end
     end
 end
 

@@ -1,6 +1,6 @@
 module HMMSolver
 
-export HMM, HMMProps
+export HMM, HMMProps, ViterbiResult
 
 using ..Util
 using NumericFuns
