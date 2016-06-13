@@ -3,7 +3,7 @@
 using JLD
 
 scene=load("/storage/malmaud/kinect/pickup1/scene.jld")["scene"]
-sentence=parse(Sentences.Sentence, "A person puts down a rat")
+sentence=parse(Sentences.Sentence, "A person picks up a rat")
 # sentence.words[1] = CloseWords.CloseWord(scene)
 # sentence.words[1].tracks=(1,2)
 
