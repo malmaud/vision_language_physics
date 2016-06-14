@@ -10,33 +10,9 @@ import ..JMain: get_score
 import Base: parse
 using ..MoveWords
 using ..ObjectWords
+using ..CloseWords
 using PyCall
 @pyimport nltk.stem.porter as porter
-
-type Sentence
-    words::Vector{Word}
-    n_tracks::Int
-end
-
-Sentence() = Sentence(Word[], 0)
-
-function get_score(scene::Scene, sentence::Sentence)
-    trackers = Tracker[]
-    hmms = HMM[]
-    for agent in 1:sentence.n_tracks
-        tracker = Tracker(scene)
-        push!(trackers, tracker)
-        push!(hmms, tracker)
-    end
-    for word in sentence.words
-        word.scene = scene
-        push!(hmms, word)
-    end
-    lattice = HMMSolver.HMMLattice(hmms)
-    frames = get(scene.detections)
-    constraints = ([get_constraint(word) for word in sentence.words]...)
-    return HMMSolver.get_ml_path(lattice, zeros(length(frames)), constraints)
-end
 
 @enum BreakLevel NO_BREAK SPACE_BREAK LINE_BREAK SENTENCE_BREAK
 
@@ -50,6 +26,35 @@ immutable Token
     label::String
     break_level::BreakLevel
 end
+
+
+type Sentence
+    words::Vector{Word}
+    n_tracks::Int
+    query::String
+    tokens::Vector{Token}
+end
+
+Sentence() = Sentence(Word[], 0, "", Token[])
+
+function get_score(scene::Scene, sentence::Sentence)
+    trackers = Tracker[]
+    hmms = HMM[]
+    for agent in 1:sentence.n_tracks
+        tracker = Tracker(scene)
+        push!(trackers, tracker)
+        push!(hmms, tracker)
+    end
+    for word in sentence.words
+        word.scene = scene
+        push!(hmms, word)
+    end
+    lattice = HMMSolver.HMMLattice{length(hmms)}(hmms)
+    frames = get(scene.detections)
+    constraints = ([get_constraint(word) for word in sentence.words]...)
+    return HMMSolver.get_ml_path(lattice, zeros(length(frames)), constraints)
+end
+
 
 
 function parse(::Type{Vector{Token}}, query::String; port::Int = 5000)
@@ -71,7 +76,10 @@ end
 
 function parse(::Type{Sentence}, query::String; kwargs...)
     tokens = parse(Vector{Token}, query; kwargs...)
-    return parse(Sentence, tokens)
+    sentence =  parse(Sentence, tokens)
+    sentence.tokens = tokens
+    sentence.query = query
+    return sentence
 end
 
 function word_for_verb(verb)
@@ -109,6 +117,28 @@ function parse(::Type{Sentence}, tokens::Vector{Token}, cur_token_id=0, my_track
                     parse(Sentence, tokens, idx, patient, sentence)
                 elseif token.label == "nsubj"
                     parse(Sentence, tokens, idx, agent, sentence)
+                end
+            end
+        end
+    elseif stemmed_word == "close"
+        agent = sentence.n_tracks + 1
+        patient = sentence.n_tracks + 2
+        sentence.n_tracks += 2
+        word = CloseWord()
+        word.tracks = (agent, patient)
+        push!(sentence.words, word)
+        for (idx, token) in enumerate(tokens)
+            if token.head == cur_token_id
+                if token.label == "nsubj"
+                    parse(Sentence, tokens, idx, agent, sentence)
+                elseif token.label == "prep" && token.word == "to"
+                    for (idx2, token2) in enumerate(tokens)
+                        if token2.head == idx
+                            if token2.label == "pobj"
+                                parse(Sentence, tokens, idx2, patient, sentence)
+                            end
+                        end
+                    end
                 end
             end
         end

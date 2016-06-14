@@ -45,7 +45,7 @@ function HMMSolver.get_likelihood(word::MoveWord, t, state_id, obs, box_ids)
         return log(.5)
     elseif state_id ∈ F1:F3
         return score
-    elseif state_id == P
+    else state_id == P
         return log(.5)
     end
 end

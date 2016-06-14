@@ -25,7 +25,7 @@ get_transition_matrix!(A, hmm::HMM, t) = get_transition_matrix!(A, hmm)
 get_likelihood(hmm::HMM, t, state, obs) = get_likelihood(hmm, state, obs)
 get_likelihood(hmm::HMM, t, state, obs, lattice_states) = get_likelihood(hmm, t, state, obs)
 
-immutable HMMLattice <: HMM
+immutable HMMLattice{N} <: HMM
     hmms::Vector{HMM}
 end
 
@@ -50,13 +50,13 @@ function get_initial_distribution(hmm::HMMLattice)
 end
 
 
-function get_transition_matrix!(A_net::Matrix{Float64}, hmm::HMMLattice, t)
-    n_states = (map(x->get_props(x).n_states, hmm.hmms)...)
+function get_transition_matrix!{Nhmms}(A_net::Matrix{Float64}, hmm::HMMLattice{Nhmms}, t)
+    n_states::NTuple{Nhmms, Int} = (map(x->get_props(x).n_states, hmm.hmms)...)
     N = prod(n_states)
     # A = map(hmm->get_transition_matrix(hmm, t), hmm.hmms)
     A = Matrix{Float64}[]
     for h in hmm.hmms  # TODO avoid doing this step every iteration
-        N_hmm = get_props(h).n_states
+        N_hmm::Int = get_props(h).n_states
         push!(A, zeros(N_hmm, N_hmm))
         get_transition_matrix!(A[end], h, t)
     end
@@ -78,12 +78,12 @@ function get_transition_matrix!(A_net::Matrix{Float64}, hmm::HMMLattice, t)
     return A_net
 end
 
-function get_likelihood(hmms::HMMLattice, t, state_id, obs)
-    n_states = (map(x->get_props(x).n_states, hmms.hmms)...)
+function get_likelihood{Nhmm}(hmms::HMMLattice{Nhmm}, t, state_id, obs)
+    n_states::NTuple{Nhmm, Int} = (map(x->get_props(x).n_states, hmms.hmms)...)
     state_ids = ind2sub(n_states, state_id)
     lh = 0.0
     for (hmm, state_id) in zip(hmms.hmms, state_ids)
-        state_lh = get_likelihood(hmm, t, state_id, obs, state_ids)
+        state_lh::Float64 = get_likelihood(hmm, t, state_id, obs, state_ids)
         lh += state_lh
     end
     return lh
