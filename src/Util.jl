@@ -30,6 +30,4 @@ function NumericFuns.logsumexp(x::Vector{Float64})
     reduce(logsumexp, x)
 end
 
-
-
 end
