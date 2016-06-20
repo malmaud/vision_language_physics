@@ -1,0 +1,11 @@
+version: '2'
+services:
+  demo:
+    build: .
+    image: alantrrs/py-faster-rcnn
+    volumes:
+      - ./data/:/home/py-faster-rcnn/data
+    devices:
+      - /dev/nvidia0
+      - /dev/nvidiactl
+      - /dev/nvidia-uvm
