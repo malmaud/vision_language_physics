@@ -190,8 +190,8 @@ namespace kinect_recorder_gui
                     }
                 }
                 //Debug.WriteLine(String.Format("Frame {0}: Got depth {1}", frameTick, buffer[0]));
-                var fullPath = Path.Combine(recordingPath, "depth", String.Format("shot_{0:D5}.png", depthIdx.frame_idx));
-                var encoder = new PngBitmapEncoder();
+                var fullPath = Path.Combine(recordingPath, "depth", String.Format("shot_{0:D5}.jpg", depthIdx.frame_idx));
+                var encoder = new JpegBitmapEncoder();
                 depthBitmap.WritePixels(new System.Windows.Int32Rect(0, 0, depthBitmap.PixelWidth, depthBitmap.PixelHeight),
                     processedBuffer, depthBitmap.PixelWidth, 0);
                 encoder.Frames.Add(BitmapFrame.Create(depthBitmap));
@@ -223,9 +223,9 @@ namespace kinect_recorder_gui
                 var buffer = bufferForFrame.buffer;
                 Debug.Print(String.Format("Queue has {0} elements", colorQueue.Count));
                 colorBitmap.WritePixels(new System.Windows.Int32Rect(0, 0, colorBitmap.PixelWidth, colorBitmap.PixelHeight), buffer, 4 * colorBitmap.PixelWidth, 0);
-                var colorEncoder = new PngBitmapEncoder();
+                var colorEncoder = new JpegBitmapEncoder();
                 colorEncoder.Frames.Add(BitmapFrame.Create(colorBitmap));
-                var fullPath = Path.Combine(recordingPath, "color", String.Format("shot_{0:D5}.png", colorIdx.frame_idx));
+                var fullPath = Path.Combine(recordingPath, "color", String.Format("shot_{0:D5}.jpg", colorIdx.frame_idx));
 
                 using (var fs = new FileStream(fullPath, FileMode.Create))
                 {
@@ -331,7 +331,7 @@ namespace kinect_recorder_gui
             ffmpeg.StartInfo.FileName = @"C:\Users\malmaud\Desktop\ffmpeg.exe";
             ffmpeg.StartInfo.UseShellExecute = false;
             ffmpeg.StartInfo.Arguments =
-                String.Format("-start_number {0} -framerate 15 -f image2 -i shot_%05d.png -vframes {1} -vcodec libx264 -b 5000k  movie_{2}.avi",
+                String.Format("-start_number {0} -framerate 30 -f image2 -i shot_%05d.jpg -vframes {1} -vcodec libx264 -b 5000k  movie_{2}.avi",
                 start_frame, end_frame-start_frame, video_id);
             ffmpeg.StartInfo.WorkingDirectory = Path.Combine(recordingPath, subfolder);
             ffmpeg.Start();
@@ -340,7 +340,7 @@ namespace kinect_recorder_gui
             Directory.SetCurrentDirectory(Path.Combine(recordingPath, subfolder));
             for(int frame_id=start_frame;frame_id<end_frame;++frame_id)
             {
-                File.Delete(String.Format("shot_{0:D5}.png", frame_id));
+                File.Delete(String.Format("shot_{0:D5}.jpg", frame_id));
             }
         }
 

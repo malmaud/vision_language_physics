@@ -1,3 +1,4 @@
+*.suo
 .dropbox.attr
 *.tags*
 scratch.jl
