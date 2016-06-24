@@ -8,8 +8,8 @@ function HMMSolver.get_initial_distribution(::HealthHMM)
     Float64[.6, .4]
 end
 
-function HMMSolver.get_transition_matrix(::HealthHMM)
-    Float64[.7 .3; .4 .6]
+function HMMSolver.get_transition_matrix!(A::Matrix, ::HealthHMM)
+    A[:] = Float64[.7 .3; .4 .6]
 end
 
 function HMMSolver.get_props(::HealthHMM)
