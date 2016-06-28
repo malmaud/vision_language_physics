@@ -179,9 +179,9 @@ function load_rcnn_detections(frames, path)
     const SCORE_THRES = .5
     for row in 1:size(data, 1)
         frame_idx = data[row, frame]
-        depth_for =  (b0, b1) -> get_depth(data[row,b0], data[row,b1], joinpath(dirname(path),"depth","frames"), frame_idx)
+        depth_for =  (b0, b1) -> get_depth(data[row,b0], data[row,b1], joinpath(dirname(path),"..","..","depth","frames"), frame_idx)
         data[row, score] < SCORE_THRES && continue
-        box = Box(Point(data[row, b0], data[row,b1], depth_for(b0,b1)), Point(data[row, b2], data[row, b3], depth_for(b2,b3)))
+        box = Box(depth_for(b0,b1), depth_for(b2,b3))
         push!(frames[frame_idx].boxes, box)
         class_idx= TRACK_MAP[data[row, label]]
         frames[frame_idx].object_scores[length(frames[frame_idx].boxes), class_idx] = data[row, score]
@@ -189,7 +189,8 @@ function load_rcnn_detections(frames, path)
 end
 
 function get_depth(x, y, depth_path, frame_idx)
-    frame = load_depth_frame(joinpath(depth_path, @sprintf("output%03d.jpg", frame_idx)))
+    frame_path = (joinpath(depth_path, @sprintf("output%03d.jpg", frame_idx)))
+    frame = load_depth_frame(frame_path)
     depth_x = clamp(round(Int, x/real_width*depth_width), 1, depth_width)
     depth_y = clamp(round(Int, y/real_height*depth_height), 1, depth_height)
 
