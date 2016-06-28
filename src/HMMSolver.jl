@@ -182,19 +182,4 @@ function get_ml_path(lattice::HMMLattice, obs::Vector, constraint=(0,))
     return ViterbiResult(Z_sub, result.score, result.T1, result.T2)
 end
 
-# function score_path(hmm::HMM, states::Vector{Int}, obs::Vector)
-#     s = 1.0
-#     π = get_initial_distribution(hmm)
-#     for t in 1:length(obs)
-#         B = get_transition_matrix(hmm, t)
-#         s *= get_likelihood(hmm, t, states[t], obs[t])
-#         if t == 1
-#             s *= π[states[t]]
-#         else
-#             s *= B[states[t-1], states[t]]
-#         end
-#     end
-#     return s
-# end
-
 end
