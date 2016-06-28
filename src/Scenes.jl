@@ -170,10 +170,11 @@ function load_rcnn_detections(frames, path)
     const frame=1
     const detection=2
     const label=3
-    const b0=4
-    const b1=5
-    const b2=6
-    const b3=7
+    const score = 4
+    const b0=5
+    const b1=6
+    const b2=7
+    const b3=8
     const SCORE_THRES = .5
     for row in 1:size(data, 1)
         data[row, score] < SCORE_THRES && continue
