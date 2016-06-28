@@ -1,7 +1,9 @@
 module Visualizer
 
-using PyPlot
-import PyPlot: plot
+try
+    using PyPlot
+    import PyPlot: plot
+end
 using ..HMMSolver
 using ..Scenes
 using ..Sentences
