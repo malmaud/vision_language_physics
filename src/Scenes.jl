@@ -17,7 +17,7 @@ using PyCall
 import Base: +, -
 
 const TRACK_MAP = Dict("right_hand"=>1, "left_hand"=>2, "rat"=>3, "monkey"=>4, "car"=>5, "person"=>6, "aeroplane"=>7, "bird"=>8, "bottle"=>9, "pottedplant"=>10, "tvmonitor"=>11)
-const MAX_BOXES = 5
+const MAX_BOXES = 10
 
 immutable Point{T}
     x::T
