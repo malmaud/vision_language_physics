@@ -46,13 +46,14 @@ function Base.show(io::IO, box::Box)
 end
 
 function plot(box::Box, box_id=1)
-    color_wheel = ["red", "green", "blue", "orange", "purple"]
+    color_wheel = ["red", "green", "blue", "orange", "purple", "red", "green", "blue", "orange", "purple"]
     ax = gca()
     # TODO: switch to coloring based on track id instead of box id
+    z = max(50, box.top_left.z)
     ax[:add_patch](
     patches.Rectangle((box.top_left.x, box.top_left.y), box.bottom_right.x-box.top_left.x, box.bottom_right.y-box.top_left.y,
      fill=false,
-     linewidth=round(Int, box.top_left.z/255*10),
+     linewidth=round(Int, z/255*10),
      edgecolor=color_wheel[mod1(box_id, length(color_wheel))]))
 end
 
@@ -177,9 +178,10 @@ function load_rcnn_detections(frames, path)
     const b3=8
     const SCORE_THRES = .5
     for row in 1:size(data, 1)
-        data[row, score] < SCORE_THRES && continue
-        box = Box(Point(data[row, b0], data[row,b1]), Point(data[row, b2], data[row, b3]))
         frame_idx = data[row, frame]
+        depth_for =  (b0, b1) -> get_depth(data[row,b0], data[row,b1], joinpath(dirname(path),"depth","frames"), frame_idx)
+        data[row, score] < SCORE_THRES && continue
+        box = Box(Point(data[row, b0], data[row,b1], depth_for(b0,b1)), Point(data[row, b2], data[row, b3], depth_for(b2,b3)))
         push!(frames[frame_idx].boxes, box)
         class_idx= TRACK_MAP[data[row, label]]
         frames[frame_idx].object_scores[length(frames[frame_idx].boxes), class_idx] = data[row, score]

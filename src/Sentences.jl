@@ -98,7 +98,7 @@ function parse(::Type{Sentence}, tokens::Vector{Token}, cur_token_id=0, my_track
         cur_token_id = findfirst([token.head==0 for token in tokens])
     end
     cur_token = tokens[cur_token_id]
-    name_map = Dict("person"=>:left_hand, "monkey"=>:monkey, "rat"=>:rat)
+    name_map = Dict("person"=>:left_hand, "monkey"=>:monkey, "rat"=>:rat, "car"=>:car, "bottle"=>:bottle, "jug"=>:bottle)
     stemmer = porter.PorterStemmer()
     stemmed_word = stemmer[:stem](cur_token.word)
     const transitive_verbs = ["pick", "put"]
