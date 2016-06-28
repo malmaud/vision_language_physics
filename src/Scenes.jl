@@ -16,7 +16,7 @@ using PyCall
 @pyimport cv2
 import Base: +, -
 
-const TRACK_MAP = Dict("right_hand"=>1, "left_hand"=>2, "rat"=>3, "monkey"=>4)
+const TRACK_MAP = Dict("right_hand"=>1, "left_hand"=>2, "rat"=>3, "monkey"=>4, "car"=>5, "person"=>6, "aeroplane"=>7, "bird"=>8, "bottle"=>9, "pottedplant"=>10, "tvmonitor"=>11)
 const MAX_BOXES = 5
 
 immutable Point{T}
@@ -165,6 +165,26 @@ function load_annotations(frames, path)
     end
 end
 
+function load_rcnn_detections(frames, path)
+    data, header = readdlm(path, ',', header=true)
+    const frame=1
+    const detection=2
+    const label=3
+    const b0=4
+    const b1=5
+    const b2=6
+    const b3=7
+    const SCORE_THRES = .5
+    for row in 1:size(data, 1)
+        data[row, score] < SCORE_THRES && continue
+        box = Box(Point(data[row, b0], data[row,b1]), Point(data[row, b2], data[row, b3]))
+        frame_idx = data[row, frame]
+        push!(frames[frame_idx].boxes, box)
+        class_idx= TRACK_MAP[data[row, label]]
+        frames[frame_idx].object_scores[length(frames[frame_idx].boxes), class_idx] = data[row, score]
+    end
+end
+
 function get_depth(x, y, depth_path, frame_idx)
     frame = load_depth_frame(joinpath(depth_path, @sprintf("output%03d.jpg", frame_idx)))
     depth_x = clamp(round(Int, x/real_width*depth_width), 1, depth_width)
@@ -227,6 +247,9 @@ function load_scene(path; max_frames=1)
 
     if isfile(joinpath(path, "hand_points.csv"))
         load_hand_positions(detections, joinpath(path, "hand_points.csv"))
+    end
+    if isfile(joinpath(path, "color", "frames", "rcnn.csv"))
+        load_rcnn_detections(detections, joinpath(path, "color", "frames", "rcnn.csv"))
     end
     if isfile(joinpath(path, "annotations.txt"))
         load_annotations(detections, joinpath(path, "annotations.txt"))

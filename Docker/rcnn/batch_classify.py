@@ -91,6 +91,7 @@ if __name__ == '__main__':
     #     demo(net, im_name)
     with open("/frames/rcnn.csv", "wb") as csvfile:
         writer = csv.writer(csvfile)
+        writer.writerow(["frame", "detection", "class", "score", "b0", "b1", "b2", "b3"])
         for im in os.listdir("/frames"):
             name, ext = os.path.splitext(im)
             if ext == ".jpg":
