@@ -10,7 +10,7 @@ immutable Tracker <: HMM
     scene::Scene
 end
 
-const MAX_BOXES = 5
+const MAX_BOXES = Scenes.MAX_BOXES
 const MISSING_BOX=MAX_BOXES
 
 max_boxes() = MAX_BOXES
