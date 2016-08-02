@@ -1,0 +1,61 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\author{Jon Malmaud}
+\title{Preliminary modeling}
+\begin{document}
+  \maketitle
+\section{Physics model}
+At each time $t$ and for each bounding box $i$ produced by the object detector, we observe its position and optical flow, designated $b^t_i$. Since this section deals with a single frame, we drop the explicit dependence on $t$ in the notation.
+
+Say we have $J$ trackers. Then the latent state $y$ at time $t$ consists of:
+
+\begin{enumerate}
+ \item The bounding box each track corresponds to, $T_j \in {b_1,\ldots,b_I}$.
+ \item The discretized force (both magnitude and direction) the track is undergoing, $F_j \in {(\text{None}, \text{Low}, \text{High})} \times (\text{Left},\text{Right},\text{Up},\text{Down},\text{Forward},\text{Back})$.
+ \item The identify of the track this track is interacting with, $I_j \in {t_1,\ldots,t_J}$.
+\end{enumerate}
+
+The distribution on the latent state is thus
+\begin{align}
+  P(y|x)&\propto P(x|y)P(y)\\
+  &=P(\vec{b}|\vec{T}, \vec{F}, \vec{I})P(\vec{T},\vec{F},\vec{I})
+\end{align}
+
+We factorize the prior as
+\begin{gather}
+  P(\vec{T}, \vec{F}, \vec{I})=\\
+  P(\vec{T})P(\vec{I}|\vec{T})P(\vec{F}|\vec{T},\vec{I})
+\end{gather}
+
+$P(\vec{T})$ is uniform over assignments of tracks to bounding boxes.
+
+$P(\vec{I}|\vec{T})$, the prior over which tracks are interacting without knowledge of the bounding box of locations, is uniform.
+
+$P(\vec{F}|\vec{T},\vec{I}$), the prior over the forces each track is undergoing given the forces each other track is undergoing, favors interacting tracks to be undergoing similar forces:
+
+\begin{equation}
+  P(\vec{F}|\vec{T},\vec{I})\propto \prod_j \text{Similarity}(F_j, F_{I_j})
+\end{equation}
+
+The likelihood is a combination of the confidence of the object detectors, the proximity of interacting bounding boxes, and the correspondance between the observed optical flow and claimed force acting on each track:
+
+\begin{equation}
+  \begin{split}
+  P(\vec{b}|\vec{T},\vec{I},\vec{F})\propto\\
+  &\prod_j {\text{ObjectScore}(b_{T_j})}\\
+  &\prod_j {\sigma((\text{Pos}(b_{T_j})-\text{Pos}(b_{T_{I_j}}))^2)}\\
+  &\prod_j P(\text{OpticalFlow}(b_{T_j})|F_j)
+\end{split}
+\end{equation}
+
+where $\sigma(x)=\frac{1}{1+e^{-x}}$.
+
+The last term is a mixture model:
+
+\begin{gather}
+  P(|\text{OpticalFlow}(b)|\ |F|=\text{High}) = N(\cdot|\mu_{\text{High}}, \sigma)\\
+  P(\vec{\text{OpticalFlow}(b)}| \vec{F}=\text{Left}) \propto \cdot * (-1, 0, 0)
+\end{gather}
+
+\end{document}
