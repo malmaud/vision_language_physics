@@ -1,5 +1,6 @@
 using JLD
 
+JLD._typedict
 scene=load("/storage/malmaud/kinect/pickup1/scene.jld")["scene"]
 
 frames=get(scene.detections)

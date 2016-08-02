@@ -20,9 +20,7 @@ function HMMSolver.get_initial_distribution(::Tracker)
     return log([1/N for n in 1:N])
 end
 
-function sigmoid(t, a, β)
-    return 1./(1+exp(-β*(t-a)))
-end
+
 
 function motion_coherence(box1::Box, box2::Box)
     return sigmoid(compute_distance(box1, box2), 50.0, -1/11)

@@ -1,6 +1,6 @@
 module Util
 
-export @not_impl, @ifnull, logsumexp
+export @not_impl, @ifnull, logsumexp, sigmoid
 
 using MacroTools
 using NumericFuns
@@ -28,6 +28,10 @@ end
 
 function NumericFuns.logsumexp(x::Vector{Float64})
     reduce(logsumexp, x)
+end
+
+function sigmoid(t, a, β)
+    return 1./(1+exp(-β*(t-a)))
 end
 
 end

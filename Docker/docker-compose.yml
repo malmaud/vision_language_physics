@@ -1,0 +1,12 @@
+version: "2"
+
+services:
+  syntaxnet:
+    extends:
+      file: "syntaxnet/docker-compose.yml"
+      service: syntaxnet
+  notebook:
+    extends:
+      file: "notebook/docker-compose.yml"
+      service: notebook
+      

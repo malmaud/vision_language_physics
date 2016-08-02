@@ -7,4 +7,4 @@ services:
     ports:
       - "1000:8888"
     volumes:
-      - /notebooks:/Users/malmaud/tmp
+      - /Users/malmaud/tmp:/notebooks
