@@ -32,10 +32,10 @@ $P(\vec{T})$ is uniform over assignments of tracks to bounding boxes.
 
 $P(\vec{I}|\vec{T})$, the prior over which tracks are interacting without knowledge of the bounding box of locations, is uniform.
 
-$P(\vec{F}|\vec{T},\vec{I}$), the prior over the forces each track is undergoing given the forces each other track is undergoing, favors interacting tracks to be undergoing similar forces:
+$P(\vec{F}|\vec{T},\vec{I}$), the prior over the net force each track is undergoing given the forces each other track is undergoing, favors conservation of force being observed:
 
 \begin{equation}
-  P(\vec{F}|\vec{T},\vec{I})\propto \prod_j \text{Similarity}(F_j, F_{I_j})
+  P(\vec{F}|\vec{T},\vec{I})\propto \prod_j \text{Similarity}(F_j, F_{I_j}+F_\text{gravity})
 \end{equation}
 
 The likelihood is a combination of the confidence of the object detectors, the proximity of interacting bounding boxes, and the correspondance between the observed optical flow and claimed force acting on each track:
@@ -51,11 +51,22 @@ The likelihood is a combination of the confidence of the object detectors, the p
 
 where $\sigma(x)=\frac{1}{1+e^{-x}}$.
 
-The last term is a mixture model:
+The last term is a mixture model, eg:
 
 \begin{gather}
   P(|\text{OpticalFlow}(b)|\ |F|=\text{High}) = N(\cdot|\mu_{\text{High}}, \sigma)\\
   P(\vec{\text{OpticalFlow}(b)}| \vec{F}=\text{Left}) \propto \cdot * (-1, 0, 0)
 \end{gather}
+
+Putting it all together,
+\begin{equation}
+  \begin{split}
+    \log{P(y|x})\propto \text{score}(b,T,I,F|\theta)=\\
+    \sum_j \theta_1\text{ObjectScore}(b_{T_j})\ +  \theta_2\sigma((\text{Pos}(b_{T_j})-\text{Pos}(b_{T_{I_j}}))^2)\ +\\
+    \theta_3 N(|\text{Flow}(b_{T_j})|\ |\ \mu_{|F_j|}, \sigma) + \theta_4 \vec{\text{Flow}}(b_{T_j})*\vec{F_j} + \theta_5 \text{Similarity}(F_j, F_{I_j}+F_\text{gravity})
+  \end{split}
+\end{equation}
+
+where $\theta$ are parameters controlling the weighting on the terms.
 
 \end{document}
