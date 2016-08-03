@@ -1,72 +1,81 @@
 \documentclass{article}
 \usepackage{amsmath}
+\usepackage{amssymb}
 \usepackage{graphicx}
 \author{Jon Malmaud}
 \title{Preliminary modeling}
 \begin{document}
   \maketitle
 \section{Physics model}
-At each time $t$ and for each bounding box $i$ produced by the object detector, we observe its position and optical flow, designated $b^t_i$. Since this section deals with a single frame, we drop the explicit dependence on $t$ in the notation.
+At each time $t$ and for each bounding box $i$ produced by the object detector, we observe its position and optical flow, designated $b^t_i$.
 
-Say we have $J$ trackers. Then the latent state $y$ at time $t$ consists of:
+Say we have $J$ trackers. Then the latent state $y_t$ at time $t$ consists of:
 
 \begin{enumerate}
- \item The bounding box each track corresponds to, $T_j \in {b_1,\ldots,b_I}$.
- \item The discretized force (both magnitude and direction) the track is undergoing, $F_j \in {(\text{None}, \text{Low}, \text{High})} \times (\text{Left},\text{Right},\text{Up},\text{Down},\text{Forward},\text{Back})$.
- \item The identify of the track this track is interacting with, $I_j \in {t_1,\ldots,t_J}$.
+ \item The bounding box each track corresponds to, $T_j^t \in {1, \ldots, I^t}$, where $I^t=\text{length}(b^t)$
+ \item The force (both magnitude and direction) the track is undergoing, $F_j^t \in \mathbb{R}^3$
+ \item The identify of the track this track is interacting with, $I_j^t \in {1, \ldots, J}$.
 \end{enumerate}
+
+For now, we also assume that the mass of each track, $m_j$, is given.
 
 The distribution on the latent state is thus
 \begin{align}
-  P(y|x)&\propto P(x|y)P(y)\\
-  &=P(\vec{b}|\vec{T}, \vec{F}, \vec{I})P(\vec{T},\vec{F},\vec{I})
+  P(y_t|x_t,y_{t-1})&\propto P(x_t|y_t,y_{t-1})P(y_t|y_{t-1})\\
+  \begin{split}
+    &=P(b^t|T^t, F^t, I^t,T^{t-1},F^{t-1},I^{t-1})\,*\\
+    &P(T^t,F^t,I^t|T^{t-1}, F^{t-1}, I^{t-1})
+  \end{split}
 \end{align}
 
 We factorize the prior as
 \begin{gather}
-  P(\vec{T}, \vec{F}, \vec{I})=\\
-  P(\vec{T})P(\vec{I}|\vec{T})P(\vec{F}|\vec{T},\vec{I})
+  P(T^t, F^t, I^t|T^{t-1}, F^{t-1}, I^{t-1})=\\
+  P(T^t)P(I^t|T^t)P(F^t|T^t,I^t,F^{t-1})
 \end{gather}
 
-$P(\vec{T})$ is uniform over assignments of tracks to bounding boxes.
+$P(T)$ is uniform over assignments of tracks to bounding boxes.
 
-$P(\vec{I}|\vec{T})$, the prior over which tracks are interacting without knowledge of the bounding box of locations, is uniform.
+$P(I|T)$, the prior over which tracks are interacting without knowledge of the bounding box of locations, is uniform.
 
-$P(\vec{F}|\vec{T},\vec{I}$), the prior over the net force each track is undergoing given the forces each other track is undergoing, favors conservation of force being observed:
+$P(F^t|T^t,I^t,F^{t_1}$), the prior over the net force each track is undergoing given the forces each other track is undergoing, favors conservation of force being observed. In calculating the net force a track is undergoing, we use the force that it's interacting track was exerted in the \emph{previous} frame to cope with the fact that the moment of impulse force impartation is not generally sampled:
 
 \begin{equation}
-  P(\vec{F}|\vec{T},\vec{I})\propto \prod_j \text{Similarity}(F_j, F_{I_j}+F_\text{gravity})
+  P(F^t|T^t, I^t)\propto \prod_j N(F_j^t|\mu=(F_{I_j^t}^{t-1}+F_\text{gravity}),\sigma)
 \end{equation}
 
-The likelihood is a combination of the confidence of the object detectors, the proximity of interacting bounding boxes, and the correspondance between the observed optical flow and claimed force acting on each track:
+The likelihood is a combination of the confidence of the object detectors, the proximity of interacting bounding boxes, the correspondance between the observed optical flow and claimed force acting on each track, and the motion coherence of each track:
 
 \begin{equation}
   \begin{split}
-  P(\vec{b}|\vec{T},\vec{I},\vec{F})\propto\\
-  &\prod_j {\text{ObjectScore}(b_{T_j})}\\
-  &\prod_j {\sigma((\text{Pos}(b_{T_j})-\text{Pos}(b_{T_{I_j}}))^2)}\\
-  &\prod_j P(\text{OpticalFlow}(b_{T_j})|F_j)
+  P(b^t|T^t,I^t,F^t,T^{t-1},I^{t-1},F^{t-1})\propto\\
+  &\prod_j {\text{ObjectScore}(b_{T_j^t}^t)}\\
+  &\prod_j {\sigma((\text{Pos}(b^t_{T_j^t})-\text{Pos}(b^t_{T^t_{I_j^t}}))^2)}\\
+  &\prod_j P(\text{Observed motion}|{F_j^t})\\
+  &\prod_j \sigma((\text{Pos}(b^t_{T_j^t}-\text{Pos}(b^{t-1}_{T_j^{t-1}}))^2)
 \end{split}
 \end{equation}
 
-where $\sigma(x)=\frac{1}{1+e^{-x}}$.
+where $\sigma(x)=\frac{1}{1+e^{\beta x}}$.
 
-The last term is a mixture model, eg:
+The observed motion term is a simple kinematics model that expresses the force acting on a track as a function of the observed motion of the track. To derive it, denote the acceleration of track $j$ and time $t$ as $\ddot{x}^t_j$, whose first-order difference approximation is $\dot{x}^t_j - \dot{x}^{t-1}_j$, which in turn is approximately $\text{Flow}(b^t_{T^t_j}) - \text{Flow}(b^{t-1}_{T^{t-1}_j})$. Then from $F=ma$, we get
 
-\begin{gather}
-  P(|\text{OpticalFlow}(b)|\ |F|=\text{High}) = N(\cdot|\mu_{\text{High}}, \sigma)\\
-  P(\vec{\text{OpticalFlow}(b)}| \vec{F}=\text{Left}) \propto \cdot * (-1, 0, 0)
-\end{gather}
+\begin{equation}
+    P(\text{Observed motion}|F_j^t)=N(m_j \ddot{x}^t_j|\mu=F^t_j,\sigma)
+\end{equation}
 
 Putting it all together,
 \begin{equation}
   \begin{split}
-    \log{P(y|x})\propto \text{score}(b,T,I,F|\theta)=\\
-    \sum_j \theta_1\text{ObjectScore}(b_{T_j})\ +  \theta_2\sigma((\text{Pos}(b_{T_j})-\text{Pos}(b_{T_{I_j}}))^2)\ +\\
-    \theta_3 N(|\text{Flow}(b_{T_j})|\ |\ \mu_{|F_j|}, \sigma) + \theta_4 \vec{\text{Flow}}(b_{T_j})*\vec{F_j} + \theta_5 \text{Similarity}(F_j, F_{I_j}+F_\text{gravity})
+    \log{P(y|x})&\propto \text{score}(b^t,T^t,I^t,F^t, b^{t-1}, T^{t-1}, I^{t-1}, F^{t-1}|\theta)=\\
+    \sum_j&\theta_1\, \text{ObjectScore}(b^t_{T^t_j})\ + \\
+    &\theta_2\,\log \sigma((\text{Pos}(b^t_{T^t_j})-\text{Pos}(b^{t-1}_{T^{t-1}_j}))^2)+\\
+    &\theta_3\,\log \sigma((\text{Pos}(b^t_{T_j^t})-\text{Pos}(b^t_{T_{I_j^t}}))^2)\ +\\
+    &\theta_4 \,\log N(m_j(\text{Flow}(b^t_{T^t_j})-\text{Flow}(b^{t-1}_{T^{t-1}_j})|\mu=F^t_j, \sigma) + \\
+    &\theta_5 \,\log N(F^t_j|\mu=(F^{t-1}_{I^t_j}+F_\text{gravity}, \sigma)
   \end{split}
 \end{equation}
 
-where $\theta$ are parameters controlling the weighting on the terms.
+where $\theta$ are parameters controlling the relative weights of the terms.
 
 \end{document}
